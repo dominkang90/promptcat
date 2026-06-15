@@ -19,6 +19,10 @@ describe("escapeHtml", () => {
   it("위험한 문자를 바꾼다", () => {
     expect(escapeHtml('<b>"x"</b>')).toBe("&lt;b&gt;&quot;x&quot;&lt;/b&gt;");
   });
+
+  it("앰퍼샌드를 먼저 이스케이프한다", () => {
+    expect(escapeHtml("a&b<c")).toBe("a&amp;b&lt;c");
+  });
 });
 
 describe("renderGallery", () => {
