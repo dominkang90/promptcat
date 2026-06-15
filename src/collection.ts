@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { extractionResultSchema, type ExtractionResult } from "./schema.js";
 
@@ -17,37 +17,31 @@ function stampKey(dir: string): string {
 }
 
 export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
-  let names: string[];
+  let dirents;
   try {
-    names = await readdir(baseDir);
+    dirents = await readdir(baseDir, { withFileTypes: true });
   } catch {
     return [];
   }
 
   const entries: ModuleEntry[] = [];
-  for (const name of names) {
-    const dir = path.join(baseDir, name);
-    try {
-      if (!(await stat(dir)).isDirectory()) continue;
-    } catch {
-      continue;
-    }
+  for (const ent of dirents) {
+    if (!ent.isDirectory()) continue;
+    const dir = path.join(baseDir, ent.name);
 
-    let result: ExtractionResult;
     try {
       const raw: unknown = JSON.parse(await readFile(path.join(dir, "prompt.json"), "utf8"));
       const parsed = extractionResultSchema.safeParse(raw);
       if (!parsed.success) continue;
-      result = parsed.data;
+
+      const files = await readdir(dir);
+      const imageFile = files.find((f) => IMAGE_EXTS.includes(path.extname(f).toLowerCase()));
+      if (!imageFile) continue;
+
+      entries.push({ dir: ent.name, imageFile, result: parsed.data });
     } catch {
       continue;
     }
-
-    const files = await readdir(dir);
-    const imageFile = files.find((f) => IMAGE_EXTS.includes(path.extname(f).toLowerCase()));
-    if (!imageFile) continue;
-
-    entries.push({ dir: name, imageFile, result });
   }
 
   entries.sort((a, b) => stampKey(b.dir).localeCompare(stampKey(a.dir)));
