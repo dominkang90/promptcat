@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { VisionProvider, VisionAnalyzeInput } from "./types.js";
+import { extractionResultSchema } from "../schema.js";
 
 export interface ClaudeProviderOptions {
   apiKey: string;
@@ -19,10 +21,9 @@ export class ClaudeProvider implements VisionProvider {
   }
 
   async analyze(input: VisionAnalyzeInput): Promise<unknown> {
-    const message = await this.#client.messages.create({
+    const response = await this.#client.messages.parse({
       model: this.#model,
       max_tokens: 4096,
-      thinking: { type: "adaptive" },
       messages: [
         {
           role: "user",
@@ -43,19 +44,11 @@ export class ClaudeProvider implements VisionProvider {
           ],
         },
       ],
+      output_config: {
+        format: zodOutputFormat(extractionResultSchema),
+      },
     });
 
-    const text = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("\n")
-      .trim();
-
-    return JSON.parse(stripFence(text));
+    return response.parsed_output;
   }
-}
-
-function stripFence(text: string): string {
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return (fence ? fence[1] : text).trim();
 }
