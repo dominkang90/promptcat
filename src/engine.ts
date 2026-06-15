@@ -32,7 +32,7 @@ export async function extractPrompt(
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    const raw = await provider.analyze({ imageBase64, mediaType, instruction });
+    const raw = await provider.analyze({ imageBase64, mediaType, instruction, imagePath });
     const parsed = extractionResultSchema.safeParse(raw);
     if (parsed.success) {
       return parsed.data;
