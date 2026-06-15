@@ -2,6 +2,13 @@ import { ClaudeProvider } from "./providers/claude.js";
 import { extractPrompt } from "./engine.js";
 import { saveModule } from "./storage.js";
 
+// .env 파일이 있으면 자동으로 읽어온다. 없으면 그냥 넘어간다.
+try {
+  process.loadEnvFile();
+} catch {
+  // .env 파일이 없는 경우 — 환경변수를 직접 넣었을 수 있으니 그대로 진행한다.
+}
+
 async function main(): Promise<void> {
   const imagePath = process.argv[2];
   if (!imagePath) {
