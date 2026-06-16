@@ -7,7 +7,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "vitest run",
-    "extract": "tsx src/cli.ts"
+    "extract": "tsx src/cli.ts",
+    "gallery": "tsx src/gallery-server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
