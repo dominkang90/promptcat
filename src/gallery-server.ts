@@ -85,13 +85,18 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
       }
 
       if (url.pathname === "/api/config") {
-        if (req.method === "POST") {
-          const patch = JSON.parse(await readBody(req)) as Partial<PromptcatConfig>;
-          saveConfig(patch, configDir);
+        try {
+          if (req.method === "POST") {
+            const patch = JSON.parse(await readBody(req)) as Partial<PromptcatConfig>;
+            saveConfig(patch, configDir);
+          }
+          const cfg = loadConfig(configDir);
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ...cfg, geminiApiKey: maskKey(cfg.geminiApiKey) }));
+        } catch (e) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
         }
-        const cfg = loadConfig(configDir);
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ...cfg, geminiApiKey: maskKey(cfg.geminiApiKey) }));
         return;
       }
 

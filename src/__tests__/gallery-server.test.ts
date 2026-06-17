@@ -107,11 +107,13 @@ describe("createGalleryServer", () => {
       expect(page.status).toBe(200);
       expect(await page.text()).toContain("설정");
 
-      await fetch(`http://localhost:${port}/api/config`, {
+      const firstPost = await fetch(`http://localhost:${port}/api/config`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ imageCount: 3, geminiApiKey: "save-me-4242" }),
       });
+      const firstJson = (await firstPost.json()) as { geminiApiKey: string };
+      expect(firstJson.geminiApiKey).toBe("****4242");
       await fetch(`http://localhost:${port}/api/config`, {
         method: "POST",
         headers: { "content-type": "application/json" },
