@@ -29,4 +29,8 @@ describe("assemblePrompt", () => {
     expect(out).not.toContain("{{");
     expect(out).toBe("여우이(가) 별과 함께 있다");
   });
+
+  it("공백만 있는 override는 저장된 값으로 채운다", () => {
+    expect(assemblePrompt(result, { char: "   " })).toBe("고양이이(가) 하트과 함께 있다");
+  });
 });
