@@ -1,0 +1,82 @@
+import { maskKey, type PromptcatConfig } from "./config.js";
+import { escapeHtml } from "./gallery.js";
+
+const ASPECTS = ["1:1", "3:4", "4:3", "16:9", "9:16"];
+
+function aspectOptions(current: string): string {
+  return ASPECTS.map(
+    (a) => `<option value="${a}"${a === current ? " selected" : ""}>${a}</option>`,
+  ).join("");
+}
+
+export function renderSettings(config: PromptcatConfig): string {
+  const masked = maskKey(config.geminiApiKey);
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>프롬냥이 설정</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin:0; background:#faf7f5; color:#333; }
+  .wrap { max-width:560px; margin:0 auto; padding:24px; }
+  h1 { font-size:20px; }
+  label { display:block; margin:16px 0 6px; font-weight:600; }
+  input, select { width:100%; padding:10px; font-size:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
+  .hint { color:#999; font-size:12px; margin-top:4px; }
+  button { margin-top:20px; padding:12px 20px; font-size:15px; border:none; border-radius:8px; background:#ff8fab; color:#fff; cursor:pointer; }
+  #msg { margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ 프롬냥이 설정</h1>
+
+  <label>Gemini API 키</label>
+  <input id="geminiApiKey" type="password" placeholder="${masked ? "현재: " + escapeHtml(masked) + " (바꿀 때만 입력)" : "키를 붙여넣어 주세요"}">
+  <div class="hint">Google AI Studio에서 무료로 받을 수 있어요. 비워두면 기존 키가 유지됩니다.</div>
+
+  <label>이미지 모델</label>
+  <input id="imageModel" type="text" value="${escapeHtml(config.imageModel)}">
+
+  <label>이미지 비율</label>
+  <select id="aspectRatio">${aspectOptions(config.aspectRatio)}</select>
+
+  <label>한 번에 만들 장수 (1~4)</label>
+  <input id="imageCount" type="number" min="1" max="4" value="${config.imageCount}">
+
+  <label>추출 방식</label>
+  <select id="extractionMode">
+    <option value="subscription"${config.extractionMode === "subscription" ? " selected" : ""}>Claude 구독</option>
+    <option value="api"${config.extractionMode === "api" ? " selected" : ""}>API 키</option>
+  </select>
+
+  <button id="save">저장</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+document.getElementById("save").addEventListener("click", async function () {
+  const patch = {
+    geminiApiKey: document.getElementById("geminiApiKey").value,
+    imageModel: document.getElementById("imageModel").value,
+    aspectRatio: document.getElementById("aspectRatio").value,
+    imageCount: Number(document.getElementById("imageCount").value),
+    extractionMode: document.getElementById("extractionMode").value,
+  };
+  const msg = document.getElementById("msg");
+  try {
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    msg.textContent = res.ok ? "저장됐어요! 🐱" : "저장 실패 😿";
+    document.getElementById("geminiApiKey").value = "";
+  } catch (e) {
+    msg.textContent = "저장 실패: " + e;
+  }
+});
+</script>
+</body>
+</html>`;
+}
