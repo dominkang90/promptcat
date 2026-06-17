@@ -35,6 +35,15 @@ describe("renderGallery", () => {
     expect(html).toContain("/img/%EC%A0%9C%ED%92%88-20260616-040114/image.png");
   });
 
+  it("상세창용 생성 UI(입력칸·버튼)와 생성물 데이터를 담는다", () => {
+    const withGen: ModuleEntry = { ...entry, generatedImages: ["gen-20260616-050000.png"] };
+    const html = renderGallery([withGen]);
+    expect(html).toContain("이미지 생성"); // 🎨 버튼 문구 (클라이언트 JS 안에 포함)
+    expect(html).toContain("data-var"); // 변동요소 입력칸을 만드는 setAttribute 코드
+    expect(html).toContain("/generate"); // 생성 요청 경로
+    expect(html).toContain("gen-20260616-050000.png"); // 생성물 파일명(임베드 데이터에 포함)
+  });
+
   it("비었으면 안내 문구", () => {
     expect(renderGallery([])).toContain("아직 먹인 사진이 없어요");
   });

@@ -102,6 +102,19 @@ function addRow(parent, k, value) {
   parent.appendChild(row);
 }
 
+function imgStrip(dir, files) {
+  if (!files.length) return null;
+  const strip = document.createElement("div");
+  strip.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px";
+  files.forEach(function (f) {
+    const im = document.createElement("img");
+    im.src = "/img/" + encodeURIComponent(dir) + "/" + encodeURIComponent(f);
+    im.style.cssText = "width:96px;height:96px;object-fit:contain;background:#f0ecea;border-radius:6px";
+    strip.appendChild(im);
+  });
+  return strip;
+}
+
 function openDetail(i) {
   const m = MODULES[i];
   const sheet = document.getElementById("sheet");
@@ -112,7 +125,53 @@ function openDetail(i) {
   const h2 = document.createElement("h2"); h2.textContent = m.result.imageType; sheet.appendChild(h2);
   addRow(sheet, "전체", m.result.fullPrompt);
   m.result.fixedElements.forEach(function (e) { addRow(sheet, "고정·" + e.category, e.value); });
-  m.result.variableElements.forEach(function (e) { addRow(sheet, "변동·" + e.category, e.value + "  " + e.placeholder); });
+
+  // 변동요소: 복사 + 수정용 입력칸
+  const inputs = {};
+  m.result.variableElements.forEach(function (e) {
+    addRow(sheet, "변동·" + e.category, e.value + "  " + e.placeholder);
+    const wrap = document.createElement("div"); wrap.className = "row";
+    const k = document.createElement("div"); k.className = "k"; k.textContent = "↳ " + e.category;
+    const inp = document.createElement("input");
+    inp.setAttribute("data-var", e.id);
+    inp.value = e.value;
+    inp.style.cssText = "flex:1;padding:6px;border:1px solid #ddd;border-radius:6px";
+    inputs[e.id] = inp;
+    wrap.append(k, inp); sheet.appendChild(wrap);
+  });
+
+  // 🎨 생성 버튼 + 결과 영역
+  const genBtn = document.createElement("button");
+  genBtn.className = "copy"; genBtn.textContent = "🎨 이미지 생성";
+  genBtn.style.cssText = "margin-top:16px;background:#ff8fab;color:#fff;border:none;padding:10px 16px";
+  const result = document.createElement("div"); result.style.marginTop = "10px";
+  const existing = imgStrip(m.dir, m.generatedImages || []);
+  if (existing) result.appendChild(existing);
+
+  genBtn.addEventListener("click", async function () {
+    const overrides = {};
+    Object.keys(inputs).forEach(function (id) { overrides[id] = inputs[id].value; });
+    genBtn.disabled = true; genBtn.textContent = "그리는 중... 🐱";
+    try {
+      const res = await fetch("/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: m.dir, overrides: overrides }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "실패");
+      const strip = imgStrip(m.dir, data.files);
+      if (strip) result.appendChild(strip);
+    } catch (e) {
+      const err = document.createElement("div"); err.style.color = "#c00";
+      err.textContent = "😿 " + e.message; result.appendChild(err);
+    } finally {
+      genBtn.disabled = false; genBtn.textContent = "🎨 이미지 생성";
+    }
+  });
+
+  sheet.appendChild(genBtn);
+  sheet.appendChild(result);
   document.getElementById("modal").classList.add("open");
 }
 
