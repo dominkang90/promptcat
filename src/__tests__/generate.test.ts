@@ -63,7 +63,13 @@ describe("generateForModule", () => {
       overrides: {},
       provider: new FakeProvider(),
       count: 3,
+      now: new Date(2026, 0, 2, 3, 4, 5),
     });
     expect(res.files.length).toBe(3);
+    expect(res.files).toEqual([
+      "gen-20260102-030405-1.png",
+      "gen-20260102-030405-2.png",
+      "gen-20260102-030405-3.png",
+    ]);
   });
 });

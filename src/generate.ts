@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { extractionResultSchema } from "./schema.js";
 import { assemblePrompt } from "./prompt-assembly.js";
+import { formatStamp } from "./storage.js";
 import type { ImageProvider } from "./image-provider.js";
 
 const EXT: Record<string, string> = {
@@ -13,14 +14,6 @@ const EXT: Record<string, string> = {
 export interface GenerateResult {
   files: string[]; // 모듈 폴더 기준 저장된 파일명들
   prompt: string;
-}
-
-function stamp(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
-    `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-  );
 }
 
 export async function generateForModule(opts: {
@@ -37,7 +30,7 @@ export async function generateForModule(opts: {
   const prompt = assemblePrompt(result, opts.overrides);
 
   const count = Math.min(Math.max(opts.count ?? 1, 1), 4);
-  const s = stamp(opts.now ?? new Date());
+  const s = formatStamp(opts.now ?? new Date());
   const files: string[] = [];
 
   for (let i = 1; i <= count; i++) {
