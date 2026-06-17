@@ -3,3 +3,4 @@ dist/
 modules/
 .env
 .superpowers/
+promptcat-config.json
