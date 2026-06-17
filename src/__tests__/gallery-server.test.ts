@@ -96,4 +96,33 @@ describe("createGalleryServer", () => {
       await new Promise<void>((r) => server.close(() => r()));
     }
   });
+
+  it("설정 라우트: 저장→조회가 되고 빈 키는 유지된다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-cfgsrv-"));
+    const server = createGalleryServer(base, { configDir: base });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const page = await fetch(`http://localhost:${port}/settings`);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("설정");
+
+      await fetch(`http://localhost:${port}/api/config`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageCount: 3, geminiApiKey: "save-me-4242" }),
+      });
+      await fetch(`http://localhost:${port}/api/config`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ geminiApiKey: "" }),
+      });
+      const got = await fetch(`http://localhost:${port}/api/config`);
+      const cfg = (await got.json()) as { imageCount: number; geminiApiKey: string };
+      expect(cfg.imageCount).toBe(3);
+      expect(cfg.geminiApiKey).toBe("****4242"); // 마스킹 + 유지
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
 });

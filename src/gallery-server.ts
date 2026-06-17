@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listModules } from "./collection.js";
 import { renderGallery } from "./gallery.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, saveConfig, maskKey, type PromptcatConfig } from "./config.js";
+import { renderSettings } from "./gallery-settings.js";
 import { generateForModule } from "./generate.js";
 import { GeminiImageProvider, type ImageProvider } from "./image-provider.js";
 
@@ -74,6 +75,23 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
           res.writeHead(500, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
         }
+        return;
+      }
+
+      if (url.pathname === "/settings") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(renderSettings(loadConfig(configDir)));
+        return;
+      }
+
+      if (url.pathname === "/api/config") {
+        if (req.method === "POST") {
+          const patch = JSON.parse(await readBody(req)) as Partial<PromptcatConfig>;
+          saveConfig(patch, configDir);
+        }
+        const cfg = loadConfig(configDir);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ...cfg, geminiApiKey: maskKey(cfg.geminiApiKey) }));
         return;
       }
 
