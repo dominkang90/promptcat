@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { createGalleryServer } from "../gallery-server.js";
+import type { ImageProvider } from "../image-provider.js";
 
 const good = {
   imageType: "제품",
@@ -43,6 +44,54 @@ describe("createGalleryServer", () => {
 
       const bad = await fetch(`http://localhost:${port}/img/..%2f..%2fetc%2fpasswd`);
       expect(bad.status).toBe(403);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /generate 는 그림을 만들어 저장한다", async () => {
+    await setup();
+    const fake: ImageProvider = {
+      async generate() {
+        return { data: Buffer.from([1, 2, 3]), mediaType: "image/png" };
+      },
+    };
+    const server = createGalleryServer(base, { provider: fake });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "product-20260101-000000", overrides: {} }),
+      });
+      expect(res.status).toBe(200);
+      const json = (await res.json()) as { files: string[] };
+      expect(json.files.length).toBe(1);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /generate 실패 시 에러 메시지를 JSON으로 준다", async () => {
+    await setup();
+    const fake: ImageProvider = {
+      async generate() {
+        throw new Error("키없음");
+      },
+    };
+    const server = createGalleryServer(base, { provider: fake });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "product-20260101-000000", overrides: {} }),
+      });
+      expect(res.status).toBe(500);
+      const json = (await res.json()) as { error: string };
+      expect(json.error).toContain("키없음");
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }

@@ -4,6 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listModules } from "./collection.js";
 import { renderGallery } from "./gallery.js";
+import { loadConfig } from "./config.js";
+import { generateForModule } from "./generate.js";
+import { GeminiImageProvider, type ImageProvider } from "./image-provider.js";
 
 const PORT = 4517;
 
@@ -15,8 +18,24 @@ const MIME: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-export function createGalleryServer(baseDir: string): http.Server {
+export interface GalleryServerOptions {
+  provider?: ImageProvider; // 테스트에서 가짜 provider 주입
+  configDir?: string; // promptcat-config.json 위치 (기본 ".")
+}
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (c) => (data += c));
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
+
+export function createGalleryServer(baseDir: string, opts: GalleryServerOptions = {}): http.Server {
   const root = path.resolve(baseDir);
+  const configDir = opts.configDir ?? ".";
+
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
@@ -25,6 +44,36 @@ export function createGalleryServer(baseDir: string): http.Server {
         const html = renderGallery(await listModules(baseDir));
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(html);
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/generate") {
+        try {
+          const { dir, overrides } = JSON.parse(await readBody(req)) as {
+            dir: string;
+            overrides?: Record<string, string>;
+          };
+          const moduleRoot = path.resolve(root, dir);
+          if (moduleRoot !== root && !moduleRoot.startsWith(root + path.sep)) {
+            res.writeHead(403, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: "forbidden" }));
+            return;
+          }
+          const config = loadConfig(configDir);
+          const provider = opts.provider ?? new GeminiImageProvider(config);
+          const result = await generateForModule({
+            baseDir,
+            dir,
+            overrides: overrides ?? {},
+            provider,
+            count: config.imageCount,
+          });
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
         return;
       }
 
@@ -37,7 +86,9 @@ export function createGalleryServer(baseDir: string): http.Server {
           return;
         }
         const data = await readFile(full);
-        res.writeHead(200, { "content-type": MIME[path.extname(full).toLowerCase()] ?? "application/octet-stream" });
+        res.writeHead(200, {
+          "content-type": MIME[path.extname(full).toLowerCase()] ?? "application/octet-stream",
+        });
         res.end(data);
         return;
       }
