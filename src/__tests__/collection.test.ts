@@ -41,5 +41,18 @@ describe("listModules", () => {
     expect(list[0].dir).toBe("제품-20260616-040114"); // 040114 > 035841
     expect(list[0].imageFile).toBe("image.png");
     expect(list[0].result.imageType).toBe("제품");
+    expect(list[0].generatedImages).toEqual([]);
+  });
+
+  it("gen-* 이미지는 generatedImages로, 썸네일은 원본으로 잡는다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-col-"));
+    const d = path.join(base, "제품-20260616-040114");
+    await mkdir(d, { recursive: true });
+    await writeFile(path.join(d, "prompt.json"), JSON.stringify(good), "utf8");
+    await writeFile(path.join(d, "image.png"), Buffer.from([0x89, 0x50]));
+    await writeFile(path.join(d, "gen-20260616-050000.png"), Buffer.from([0x89, 0x50]));
+    const list = await listModules(base);
+    expect(list[0].imageFile).toBe("image.png");
+    expect(list[0].generatedImages).toEqual(["gen-20260616-050000.png"]);
   });
 });

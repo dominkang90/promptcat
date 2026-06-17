@@ -5,6 +5,7 @@ import { extractionResultSchema, type ExtractionResult } from "./schema.js";
 export interface ModuleEntry {
   dir: string; // modules/ 기준 폴더 이름
   imageFile: string; // 예: "image.png"
+  generatedImages: string[]; // gen-* 로 만든 그림 파일명들
   result: ExtractionResult;
 }
 
@@ -35,10 +36,12 @@ export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
       if (!parsed.success) continue;
 
       const files = await readdir(dir);
-      const imageFile = files.find((f) => IMAGE_EXTS.includes(path.extname(f).toLowerCase()));
+      const images = files.filter((f) => IMAGE_EXTS.includes(path.extname(f).toLowerCase()));
+      const imageFile = images.find((f) => !f.startsWith("gen-")) ?? images[0];
       if (!imageFile) continue;
+      const generatedImages = images.filter((f) => f.startsWith("gen-")).sort();
 
-      entries.push({ dir: ent.name, imageFile, result: parsed.data });
+      entries.push({ dir: ent.name, imageFile, generatedImages, result: parsed.data });
     } catch {
       continue;
     }

@@ -5,6 +5,7 @@ import type { ModuleEntry } from "../collection.js";
 const entry: ModuleEntry = {
   dir: "제품-20260616-040114",
   imageFile: "image.png",
+  generatedImages: [],
   result: {
     imageType: "제품",
     fullPrompt: "따뜻한 제품 사진",
