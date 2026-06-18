@@ -90,10 +90,16 @@ document.getElementById("save").addEventListener("click", async function () {
 });
 
 document.getElementById("deleteKey").addEventListener("click", async function () {
-  await fetch("/api/config/clear-key", { method: "POST" });
-  document.getElementById("keyStatus").textContent = "등록 안 됨";
-  document.getElementById("geminiApiKey").value = "";
-  document.getElementById("msg").textContent = "키를 삭제했어요 🗑️";
+  const msg = document.getElementById("msg");
+  try {
+    const res = await fetch("/api/config/clear-key", { method: "POST" });
+    if (!res.ok) throw new Error("실패");
+    document.getElementById("keyStatus").textContent = "등록 안 됨";
+    document.getElementById("geminiApiKey").value = "";
+    msg.textContent = "키를 삭제했어요 🗑️";
+  } catch (e) {
+    msg.textContent = "삭제 실패: " + e;
+  }
 });
 </script>
 </body>
