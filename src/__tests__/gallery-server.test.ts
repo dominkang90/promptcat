@@ -97,6 +97,25 @@ describe("createGalleryServer", () => {
     }
   });
 
+  it("POST /api/config/clear-key 는 키를 비운다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-clrkey-"));
+    const server = createGalleryServer(base, { configDir: base });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      await fetch(`http://localhost:${port}/api/config`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ geminiApiKey: "delete-me-5555" }),
+      });
+      const cleared = await fetch(`http://localhost:${port}/api/config/clear-key`, { method: "POST" });
+      const cfg = (await cleared.json()) as { geminiApiKey: string };
+      expect(cfg.geminiApiKey).toBe("");
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it("설정 라우트: 저장→조회가 되고 빈 키는 유지된다", async () => {
     base = await mkdtemp(path.join(tmpdir(), "promptcat-cfgsrv-"));
     const server = createGalleryServer(base, { configDir: base });

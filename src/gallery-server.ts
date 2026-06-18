@@ -4,10 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listModules } from "./collection.js";
 import { renderGallery } from "./gallery.js";
-import { loadConfig, saveConfig, maskKey, type PromptcatConfig } from "./config.js";
+import { loadConfig, saveConfig, maskKey, clearGeminiKey, type PromptcatConfig } from "./config.js";
 import { renderSettings } from "./gallery-settings.js";
 import { generateForModule } from "./generate.js";
-import { GeminiImageProvider, type ImageProvider } from "./image-provider.js";
+import { GeminiImageProvider, PollinationsImageProvider, type ImageProvider } from "./image-provider.js";
 
 const PORT = 4517;
 
@@ -50,9 +50,10 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
 
       if (req.method === "POST" && url.pathname === "/generate") {
         try {
-          const { dir, overrides } = JSON.parse(await readBody(req)) as {
+          const { dir, overrides, backend } = JSON.parse(await readBody(req)) as {
             dir: string;
             overrides?: Record<string, string>;
+            backend?: string;
           };
           const moduleRoot = path.resolve(root, dir);
           if (moduleRoot !== root && !moduleRoot.startsWith(root + path.sep)) {
@@ -61,7 +62,10 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
             return;
           }
           const config = loadConfig(configDir);
-          const provider = opts.provider ?? new GeminiImageProvider(config);
+          const chosen = backend ?? config.imageBackend;
+          const provider =
+            opts.provider ??
+            (chosen === "gemini" ? new GeminiImageProvider(config) : new PollinationsImageProvider(config));
           const result = await generateForModule({
             baseDir,
             dir,
@@ -81,6 +85,13 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
       if (url.pathname === "/settings") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(renderSettings(loadConfig(configDir)));
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/config/clear-key") {
+        const cfg = clearGeminiKey(configDir);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ...cfg, geminiApiKey: maskKey(cfg.geminiApiKey) }));
         return;
       }
 
