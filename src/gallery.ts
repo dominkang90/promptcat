@@ -76,6 +76,8 @@ ${body}
 
 <script>
 const MODULES = ${data};
+let DEFAULT_BACKEND = "pollinations";
+fetch("/api/config").then(function (r) { return r.json(); }).then(function (c) { if (c && c.imageBackend) DEFAULT_BACKEND = c.imageBackend; }).catch(function () {});
 
 document.getElementById("q").addEventListener("input", function () {
   const t = this.value.trim().toLowerCase();
@@ -140,13 +142,37 @@ function openDetail(i) {
     wrap.append(k, inp); sheet.appendChild(wrap);
   });
 
-  // 🎨 생성 버튼 + 결과 영역
+  // 백엔드 선택 + 🎨 생성 + AI 스튜디오
+  const tools = document.createElement("div"); tools.className = "row";
+  const backendSel = document.createElement("select");
+  backendSel.style.cssText = "flex:0 0 auto;padding:6px;border:1px solid #ddd;border-radius:6px";
+  backendSel.innerHTML = '<option value="pollinations">무료 (Pollinations)</option><option value="gemini">Gemini 키</option>';
+  backendSel.value = DEFAULT_BACKEND;
   const genBtn = document.createElement("button");
   genBtn.className = "copy"; genBtn.textContent = "🎨 이미지 생성";
-  genBtn.style.cssText = "margin-top:16px;background:#ff8fab;color:#fff;border:none;padding:10px 16px";
+  genBtn.style.cssText = "background:#ff8fab;color:#fff;border:none;padding:10px 16px";
+  const studioBtn = document.createElement("button");
+  studioBtn.className = "copy"; studioBtn.textContent = "✨ AI 스튜디오에서 만들기";
+  studioBtn.style.cssText = "padding:10px 16px";
+  tools.append(backendSel, genBtn, studioBtn);
+
   const result = document.createElement("div"); result.style.marginTop = "10px";
   const existing = imgStrip(m.dir, m.generatedImages || []);
   if (existing) result.appendChild(existing);
+
+  function assemble() {
+    let out = m.result.fullPrompt;
+    m.result.variableElements.forEach(function (e) {
+      const v = (inputs[e.id].value || "").trim() || e.value;
+      out = out.split(e.placeholder).join(v);
+    });
+    return out;
+  }
+
+  studioBtn.addEventListener("click", function () {
+    navigator.clipboard.writeText(assemble());
+    window.open("https://aistudio.google.com/", "_blank");
+  });
 
   genBtn.addEventListener("click", async function () {
     const overrides = {};
@@ -156,7 +182,7 @@ function openDetail(i) {
       const res = await fetch("/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dir: m.dir, overrides: overrides }),
+        body: JSON.stringify({ dir: m.dir, overrides: overrides, backend: backendSel.value }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "실패");
@@ -170,7 +196,7 @@ function openDetail(i) {
     }
   });
 
-  sheet.appendChild(genBtn);
+  sheet.appendChild(tools);
   sheet.appendChild(result);
   document.getElementById("modal").classList.add("open");
 }

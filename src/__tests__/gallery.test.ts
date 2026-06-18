@@ -44,6 +44,14 @@ describe("renderGallery", () => {
     expect(html).toContain("gen-20260616-050000.png"); // 생성물 파일명(임베드 데이터에 포함)
   });
 
+  it("백엔드 선택칸과 AI 스튜디오 버튼을 담는다", () => {
+    const html = renderGallery([entry]);
+    expect(html).toContain("AI 스튜디오에서 만들기");
+    expect(html).toContain("Pollinations");
+    expect(html).toContain("aistudio.google.com");
+    expect(html).toContain("backend:");
+  });
+
   it("비었으면 안내 문구", () => {
     expect(renderGallery([])).toContain("아직 먹인 사진이 없어요");
   });
