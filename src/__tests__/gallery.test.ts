@@ -56,6 +56,11 @@ describe("renderGallery", () => {
     expect(renderGallery([])).toContain("아직 먹인 사진이 없어요");
   });
 
+  it("헤더와 빈 화면에 DeskCat 마스코트 이미지를 쓴다", () => {
+    expect(renderGallery([entry])).toContain('src="/mascot.png"'); // 헤더 로고
+    expect(renderGallery([])).toContain('src="/mascot.png"'); // 빈 화면 마스코트
+  });
+
   it("스크립트 깨짐 방지로 < 를 이스케이프한다", () => {
     const evil: ModuleEntry = { ...entry, result: { ...entry.result, fullPrompt: "a</script>b" } };
     const html = renderGallery([evil]);

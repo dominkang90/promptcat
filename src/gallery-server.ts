@@ -115,6 +115,13 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
         return;
       }
 
+      if (url.pathname === "/mascot.png") {
+        const file = path.join(path.dirname(fileURLToPath(import.meta.url)), "../assets/mascot/deskcat.png");
+        res.writeHead(200, { "content-type": "image/png" });
+        res.end(await readFile(file));
+        return;
+      }
+
       if (url.pathname.startsWith("/img/")) {
         const rel = decodeURIComponent(url.pathname.slice("/img/".length));
         const full = path.resolve(root, rel);

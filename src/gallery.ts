@@ -34,7 +34,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 
   const body = entries.length
     ? `<div class="grid" id="grid">\n${cards}\n</div>`
-    : `<p class="empty">아직 먹인 사진이 없어요 🐱</p>`;
+    : `<div class="empty"><img class="empty-cat" src="/mascot.png" alt=""><p>아직 먹인 사진이 없어요</p></div>`;
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -44,7 +44,9 @@ export function renderGallery(entries: ModuleEntry[]): string {
 <style>
   body { font-family: system-ui, sans-serif; margin:0; background:#faf7f5; color:#333; }
   header { padding:16px; position:sticky; top:0; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08); }
-  h1 { font-size:18px; margin:0 0 8px; }
+  h1 { font-size:18px; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  h1 .logo { height:36px; width:auto; }
+  .empty img.empty-cat { width:160px; height:auto; display:block; margin:0 auto 12px; }
   #q { width:100%; padding:10px; font-size:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; padding:16px; }
   .card { background:#fff; border-radius:10px; overflow:hidden; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.1); }
@@ -65,7 +67,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 </head>
 <body>
 <header>
-  <h1>🐱 프롬냥이 컬렉션</h1>
+  <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션</h1>
   <input id="q" placeholder="🔍 검색 (유형·단어)">
 </header>
 ${body}

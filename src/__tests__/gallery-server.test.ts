@@ -146,4 +146,20 @@ describe("createGalleryServer", () => {
       await new Promise<void>((r) => server.close(() => r()));
     }
   });
+
+  it("GET /mascot.png 는 마스코트 이미지를 준다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-mascot-"));
+    const server = createGalleryServer(base);
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/mascot.png`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("image/png");
+      const buf = Buffer.from(await res.arrayBuffer());
+      expect(buf.length).toBeGreaterThan(0);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
 });
