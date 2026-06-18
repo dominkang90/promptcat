@@ -56,7 +56,7 @@ describe("createGalleryServer", () => {
         return { data: Buffer.from([1, 2, 3]), mediaType: "image/png" };
       },
     };
-    const server = createGalleryServer(base, { provider: fake });
+    const server = createGalleryServer(base, { provider: fake, translate: async (t) => t });
     await new Promise<void>((r) => server.listen(0, r));
     const port = (server.address() as AddressInfo).port;
     try {
@@ -80,7 +80,7 @@ describe("createGalleryServer", () => {
         throw new Error("키없음");
       },
     };
-    const server = createGalleryServer(base, { provider: fake });
+    const server = createGalleryServer(base, { provider: fake, translate: async (t) => t });
     await new Promise<void>((r) => server.listen(0, r));
     const port = (server.address() as AddressInfo).port;
     try {

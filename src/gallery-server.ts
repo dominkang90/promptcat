@@ -23,6 +23,7 @@ const MIME: Record<string, string> = {
 export interface GalleryServerOptions {
   provider?: ImageProvider; // 테스트에서 가짜 provider 주입
   configDir?: string; // promptcat-config.json 위치 (기본 ".")
+  translate?: (text: string, config: PromptcatConfig) => Promise<string>; // 테스트에서 가짜 번역 주입
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -37,6 +38,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 export function createGalleryServer(baseDir: string, opts: GalleryServerOptions = {}): http.Server {
   const root = path.resolve(baseDir);
   const configDir = opts.configDir ?? ".";
+  const translateFn = opts.translate ?? translateToEnglish;
 
   return http.createServer(async (req, res) => {
     try {
@@ -73,7 +75,7 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
             overrides: overrides ?? {},
             provider,
             count: config.imageCount,
-            translate: (t) => translateToEnglish(t, config),
+            translate: (t) => translateFn(t, config),
           });
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify(result));
