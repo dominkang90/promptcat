@@ -11,6 +11,7 @@ function aspectOptions(current: string): string {
 
 export function renderSettings(config: PromptcatConfig): string {
   const masked = maskKey(config.geminiApiKey);
+  const keyStatus = masked ? "✓ 등록됨 (" + escapeHtml(masked) + ")" : "등록 안 됨";
   return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -24,6 +25,7 @@ export function renderSettings(config: PromptcatConfig): string {
   input, select { width:100%; padding:10px; font-size:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
   .hint { color:#999; font-size:12px; margin-top:4px; }
   button { margin-top:20px; padding:12px 20px; font-size:15px; border:none; border-radius:8px; background:#ff8fab; color:#fff; cursor:pointer; }
+  button.minor { margin-top:8px; padding:6px 12px; font-size:13px; background:#bbb; }
   #msg { margin-top:12px; }
 </style>
 </head>
@@ -31,9 +33,18 @@ export function renderSettings(config: PromptcatConfig): string {
 <div class="wrap">
   <h1>⚙️ 프롬냥이 설정</h1>
 
+  <label>기본 이미지 생성기</label>
+  <select id="imageBackend">
+    <option value="pollinations"${config.imageBackend === "pollinations" ? " selected" : ""}>무료 (Pollinations)</option>
+    <option value="gemini"${config.imageBackend === "gemini" ? " selected" : ""}>Gemini (키 필요·유료)</option>
+  </select>
+  <div class="hint">상세창에서 그릴 때마다 바꿀 수도 있어요.</div>
+
   <label>Gemini API 키</label>
-  <input id="geminiApiKey" type="password" placeholder="${masked ? "현재: " + escapeHtml(masked) + " (바꿀 때만 입력)" : "키를 붙여넣어 주세요"}">
-  <div class="hint">Google AI Studio에서 무료로 받을 수 있어요. 비워두면 기존 키가 유지됩니다.</div>
+  <div id="keyStatus" class="hint">${keyStatus}</div>
+  <input id="geminiApiKey" type="password" placeholder="${masked ? "바꿀 때만 입력" : "키를 붙여넣어 주세요"}">
+  <button type="button" class="minor" id="deleteKey">키 삭제</button>
+  <div class="hint">Gemini 그림 생성은 결제가 필요해요. 비워두면 기존 키가 유지됩니다.</div>
 
   <label>이미지 모델</label>
   <input id="imageModel" type="text" value="${escapeHtml(config.imageModel)}">
@@ -62,6 +73,7 @@ document.getElementById("save").addEventListener("click", async function () {
     aspectRatio: document.getElementById("aspectRatio").value,
     imageCount: Number(document.getElementById("imageCount").value),
     extractionMode: document.getElementById("extractionMode").value,
+    imageBackend: document.getElementById("imageBackend").value,
   };
   const msg = document.getElementById("msg");
   try {
@@ -75,6 +87,13 @@ document.getElementById("save").addEventListener("click", async function () {
   } catch (e) {
     msg.textContent = "저장 실패: " + e;
   }
+});
+
+document.getElementById("deleteKey").addEventListener("click", async function () {
+  await fetch("/api/config/clear-key", { method: "POST" });
+  document.getElementById("keyStatus").textContent = "등록 안 됨";
+  document.getElementById("geminiApiKey").value = "";
+  document.getElementById("msg").textContent = "키를 삭제했어요 🗑️";
 });
 </script>
 </body>

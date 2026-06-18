@@ -16,4 +16,17 @@ describe("renderSettings", () => {
     expect(html).toContain("****7777");
     expect(html).not.toContain("supersecret-7777");
   });
+
+  it("기본 생성기 선택지와 키 관리 UI를 담는다", () => {
+    const html = renderSettings({ ...DEFAULT_CONFIG, geminiApiKey: "abcd1234zzzz" });
+    expect(html).toContain("기본 이미지 생성기");
+    expect(html).toContain("Pollinations");
+    expect(html).toContain("✓ 등록됨");
+    expect(html).toContain("키 삭제");
+    expect(html).toContain("/api/config/clear-key");
+  });
+
+  it("키가 없으면 등록 안 됨 표시", () => {
+    expect(renderSettings(DEFAULT_CONFIG)).toContain("등록 안 됨");
+  });
 });
