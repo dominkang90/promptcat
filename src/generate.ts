@@ -23,11 +23,14 @@ export async function generateForModule(opts: {
   provider: ImageProvider;
   count?: number;
   now?: Date;
+  translate?: (text: string) => Promise<string>;
 }): Promise<GenerateResult> {
   const moduleDir = path.join(opts.baseDir, opts.dir);
   const raw: unknown = JSON.parse(await readFile(path.join(moduleDir, "prompt.json"), "utf8"));
   const result = extractionResultSchema.parse(raw);
-  const prompt = assemblePrompt(result, opts.overrides);
+  const assembled = assemblePrompt(result, opts.overrides);
+  // 번역 함수를 주면 영어로 바꿔서 생성·기록한다(없으면 원문 그대로).
+  const prompt = opts.translate ? await opts.translate(assembled) : assembled;
 
   const count = Math.min(Math.max(opts.count ?? 1, 1), 4);
   const s = formatStamp(opts.now ?? new Date());

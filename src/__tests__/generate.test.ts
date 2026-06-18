@@ -72,4 +72,19 @@ describe("generateForModule", () => {
       "gen-20260102-030405-3.png",
     ]);
   });
+
+  it("translate를 주면 번역된 프롬프트로 생성하고 기록한다", async () => {
+    await setup();
+    const provider = new FakeProvider();
+    const res = await generateForModule({
+      baseDir: base,
+      dir: "일러스트-20260101-000000",
+      overrides: { char: "강아지" },
+      provider,
+      translate: async (t) => `EN(${t})`,
+      now: new Date(2026, 0, 2, 3, 4, 5),
+    });
+    expect(provider.lastPrompt).toBe("EN(강아지 그림)");
+    expect(res.prompt).toBe("EN(강아지 그림)");
+  });
 });

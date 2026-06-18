@@ -7,6 +7,7 @@ import { renderGallery } from "./gallery.js";
 import { loadConfig, saveConfig, maskKey, clearGeminiKey, type PromptcatConfig } from "./config.js";
 import { renderSettings } from "./gallery-settings.js";
 import { generateForModule } from "./generate.js";
+import { translateToEnglish } from "./translate.js";
 import { GeminiImageProvider, PollinationsImageProvider, type ImageProvider } from "./image-provider.js";
 
 const PORT = 4517;
@@ -72,6 +73,7 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
             overrides: overrides ?? {},
             provider,
             count: config.imageCount,
+            translate: (t) => translateToEnglish(t, config),
           });
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify(result));
