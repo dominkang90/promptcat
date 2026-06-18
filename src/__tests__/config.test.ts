@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { loadConfig, saveConfig, maskKey, DEFAULT_CONFIG } from "../config.js";
+import { loadConfig, saveConfig, maskKey, clearGeminiKey, DEFAULT_CONFIG } from "../config.js";
 
 let base: string;
 afterEach(async () => {
@@ -37,5 +37,17 @@ describe("config", () => {
     expect(maskKey("abcdefgh1234")).toBe("****1234");
     expect(maskKey("")).toBe("");
     expect(maskKey("ab")).toBe("****");
+  });
+
+  it("기본 이미지 백엔드는 pollinations", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-cfg-"));
+    expect(loadConfig(base).imageBackend).toBe("pollinations");
+  });
+
+  it("clearGeminiKey는 키를 비운다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-cfg-"));
+    saveConfig({ geminiApiKey: "to-be-removed-1111" }, base);
+    const after = clearGeminiKey(base);
+    expect(after.geminiApiKey).toBe("");
   });
 });

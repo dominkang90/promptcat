@@ -7,6 +7,7 @@ export interface PromptcatConfig {
   aspectRatio: string;
   imageCount: number;
   extractionMode: "subscription" | "api";
+  imageBackend: "pollinations" | "gemini";
 }
 
 export const DEFAULT_CONFIG: PromptcatConfig = {
@@ -15,6 +16,7 @@ export const DEFAULT_CONFIG: PromptcatConfig = {
   aspectRatio: "1:1",
   imageCount: 1,
   extractionMode: "subscription",
+  imageBackend: "pollinations",
 };
 
 const CONFIG_FILE = "promptcat-config.json";
@@ -54,4 +56,11 @@ export function maskKey(key: string): string {
   if (!key) return "";
   if (key.length <= 4) return "****";
   return "****" + key.slice(-4);
+}
+
+// 키를 확실히 지운다(빈 키 무시 규칙을 우회).
+export function clearGeminiKey(baseDir = "."): PromptcatConfig {
+  const next = { ...readFileConfig(baseDir), geminiApiKey: "" };
+  writeFileSync(path.join(baseDir, CONFIG_FILE), JSON.stringify(next, null, 2), "utf8");
+  return next;
 }
