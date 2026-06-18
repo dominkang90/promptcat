@@ -75,6 +75,7 @@ describe("buildPollinationsUrl", () => {
     expect(url).toContain(encodeURIComponent("귀여운 고양이"));
     expect(url).toContain("width=1280");
     expect(url).toContain("height=720");
+    expect(url).toContain("model=flux");
   });
 });
 

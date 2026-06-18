@@ -96,7 +96,7 @@ export function aspectToSize(aspect: string): { width: number; height: number } 
 export function buildPollinationsUrl(prompt: string, config: PromptcatConfig): string {
   const { width, height } = aspectToSize(config.aspectRatio);
   const enc = encodeURIComponent(prompt);
-  return `https://image.pollinations.ai/prompt/${enc}?width=${width}&height=${height}&nologo=true`;
+  return `https://image.pollinations.ai/prompt/${enc}?width=${width}&height=${height}&nologo=true&model=flux`;
 }
 
 // 키·결제가 필요 없는 무료 생성기(Flux 기반).
