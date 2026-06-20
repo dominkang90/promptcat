@@ -414,8 +414,45 @@ function saveModule() {
     .catch(function () { alert("저장 실패 😿"); });
 }
 
-// B2에서 채운다(라이브러리 피커)
-function openPicker() {}
+// 라이브러리 피커: 카테고리별 요소를 불러와 고르고, 즐겨찾기·숨김을 토글한다
+function openPicker(category, group, idx) {
+  const pk = document.getElementById("picker");
+  const body = document.getElementById("pickerBody");
+  document.getElementById("pickerTitle").textContent = category + " 요소 고르기";
+  let q = "";
+  function load() {
+    fetch("/api/elements?category=" + encodeURIComponent(category) + "&q=" + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (list) {
+        body.innerHTML = "";
+        list.forEach(function (el) {
+          const item = document.createElement("div"); item.className = "pkitem"; item.title = el.value;
+          item.innerHTML =
+            '<div class="pkthumbs">' + (el.sources || []).slice(0, 4).map(function (s) {
+              return '<span class="pkdir">' + escapeHtmlJs(s) + "</span>"; }).join("") + "</div>" +
+            '<div class="pkval">' + escapeHtmlJs(el.value) + "</div>" +
+            '<div class="pkbtns"><button data-a="fav">' + (el.favorite ? "★" : "☆") + '</button><button data-a="hide">👁</button><button data-a="use">사용</button></div>";
+          item.querySelector('[data-a=use]').onclick = function () { choose(el); };
+          item.querySelector('[data-a=fav]').onclick = function () { meta(el.key, { favorite: !el.favorite }); };
+          item.querySelector('[data-a=hide]').onclick = function () { meta(el.key, { hidden: true }); };
+          body.appendChild(item);
+        });
+      });
+  }
+  function meta(key, patch) {
+    fetch("/api/elements/meta", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.assign({ key: key }, patch)) })
+      .then(load);
+  }
+  function choose(el) {
+    const target = EDIT[group][idx];
+    if (target) { target.value = el.value; if (el.placeholder) target.placeholder = el.placeholder; }
+    else EDIT[group].push({ id: "new-" + Date.now(), category: category, value: el.value, placeholder: el.placeholder || "" });
+    pk.classList.remove("open"); renderEdit();
+  }
+  document.getElementById("pickerSearch").oninput = function () { q = this.value; load(); };
+  document.getElementById("pickerSearch").value = "";
+  pk.classList.add("open"); load();
+}
 </script>
 </body>
 </html>`;

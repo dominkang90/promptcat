@@ -91,4 +91,11 @@ describe("renderGallery", () => {
     expect(html).toContain("function editElement");
     expect(html).toContain("/api/module/update");
   });
+
+  it("라이브러리 피커 JS 훅이 렌더링된다", () => {
+    const html = renderGallery([]);
+    expect(html).toContain("function openPicker");
+    expect(html).toContain("/api/elements?category=");
+    expect(html).toContain("/api/elements/meta");
+  });
 });
