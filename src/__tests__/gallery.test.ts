@@ -84,4 +84,11 @@ describe("renderGallery", () => {
     const html = renderGallery([evil]);
     expect(html).toContain("\\u003c/script>");
   });
+
+  it("편집 저장·요소편집 JS 훅이 렌더링된다", () => {
+    const html = renderGallery([]); // 빈 갤러리여도 스크립트는 포함
+    expect(html).toContain("function saveModule");
+    expect(html).toContain("function editElement");
+    expect(html).toContain("/api/module/update");
+  });
 });

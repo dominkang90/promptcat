@@ -91,6 +91,27 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .row .v { flex:1; white-space:pre-wrap; word-break:break-word; }
   button.copy { flex:0 0 auto; border:1px solid #ddd; background:#f7f4f2; border-radius:6px; padding:4px 10px; cursor:pointer; }
   .close { float:right; border:none; background:none; font-size:22px; cursor:pointer; line-height:1; }
+  /* 편집 팝업의 요소 카드 */
+  #elbox { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+  .elcard { border:1px solid #eee; border-radius:8px; padding:8px 10px; background:#fbf8f7; cursor:grab; }
+  .elcard.dragging { opacity:.4; }
+  .elcat { font-size:12px; color:#888; margin-bottom:2px; }
+  .elcat .ph { color:#c0689a; }
+  .elval { font-weight:600; word-break:break-word; }
+  .eledit { width:100%; padding:6px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
+  .elbtns { margin-top:4px; display:flex; gap:6px; }
+  .elbtns button { border:1px solid #ddd; background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; }
+  .saveModule { background:#ff8fab; color:#fff; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; }
+  /* 라이브러리 피커 */
+  #picker .sheet { max-width:560px; }
+  #pickerSearch { width:100%; padding:8px; margin:8px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
+  #pickerBody { display:flex; flex-direction:column; gap:6px; }
+  .pkitem { border:1px solid #eee; border-radius:8px; padding:8px 10px; background:#fbf8f7; }
+  .pkthumbs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px; }
+  .pkdir { font-size:10px; color:#999; background:#f0ecea; border-radius:4px; padding:1px 6px; }
+  .pkval { font-weight:600; word-break:break-word; }
+  .pkbtns { margin-top:4px; display:flex; gap:6px; }
+  .pkbtns button { border:1px solid #ddd; background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -105,8 +126,25 @@ ${body}
   <div class="sheet" id="sheet"></div>
 </div>
 
+<div class="modal" id="picker">
+  <div class="sheet">
+    <button class="close" onclick="document.getElementById('picker').classList.remove('open')">×</button>
+    <h2 id="pickerTitle"></h2>
+    <input id="pickerSearch" placeholder="🔍 검색">
+    <div id="pickerBody"></div>
+  </div>
+</div>
+
 <script>
 const MODULES = ${data};
+
+// 클라이언트용 HTML escape (innerHTML에 값을 넣을 때 사용)
+function escapeHtmlJs(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 let DEFAULT_BACKEND = "pollinations";
 fetch("/api/config").then(function (r) { return r.json(); }).then(function (c) { if (c && c.imageBackend) DEFAULT_BACKEND = c.imageBackend; }).catch(function () {});
 
@@ -212,12 +250,23 @@ function openDetail(i) {
   sheet.appendChild(close);
   const h2 = document.createElement("h2"); h2.textContent = m.result.imageType; sheet.appendChild(h2);
   addRow(sheet, "전체", m.result.fullPrompt);
-  m.result.fixedElements.forEach(function (e) { addRow(sheet, "고정·" + e.category, e.value); });
 
-  // 변동요소: 복사 + 수정용 입력칸
+  // 편집용 요소 상태를 MODULES[i]에서 복제(원본 안 건드리게)
+  EDIT = {
+    dir: m.dir,
+    fixed: m.result.fixedElements.map(function (e) { return { id: e.id, category: e.category, value: e.value }; }),
+    variable: m.result.variableElements.map(function (e) { return { id: e.id, category: e.category, value: e.value, placeholder: e.placeholder }; }),
+  };
+  const elbox = document.createElement("div"); elbox.id = "elbox"; sheet.appendChild(elbox);
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "saveModule"; saveBtn.textContent = "💾 저장";
+  saveBtn.addEventListener("click", saveModule);
+  sheet.appendChild(saveBtn);
+  renderEdit();
+
+  // 변동요소: 🎨 생성용 수정 입력칸(요소 카드와 별개로 한 번 그리기용 override 입력)
   const inputs = {};
   m.result.variableElements.forEach(function (e) {
-    addRow(sheet, "변동·" + e.category, e.value + "  " + e.placeholder);
     const wrap = document.createElement("div"); wrap.className = "row";
     const k = document.createElement("div"); k.className = "k"; k.textContent = "↳ " + e.category;
     const inp = document.createElement("input");
@@ -290,6 +339,83 @@ function openDetail(i) {
 function closeDetail() {
   document.getElementById("modal").classList.remove("open");
 }
+
+// ── 편집 팝업의 요소 카드 ──────────────────────────────
+// 열 때 MODULES[i]에서 복제해 담는다: { dir, fixed:[...], variable:[...] }
+let EDIT = null;
+
+// 카드 한 장(요소 하나)을 만든다
+function elCard(group, idx) {
+  const e = EDIT[group][idx];
+  const card = document.createElement("div");
+  card.className = "elcard"; card.draggable = true;
+  card.dataset.group = group; card.dataset.idx = idx;
+  card.innerHTML =
+    '<div class="elcat">' + escapeHtmlJs(e.category) + (group === "variable" ? ' <span class="ph">' + escapeHtmlJs(e.placeholder || "") + "</span>" : "") + "</div>" +
+    '<div class="elval">' + escapeHtmlJs(e.value) + "</div>" +
+    '<div class="elbtns"><button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>";
+  card.querySelector('[data-a=edit]').onclick = function () { editElement(group, idx, card); };
+  card.querySelector('[data-a=del]').onclick = function () { EDIT[group].splice(idx, 1); renderEdit(); };
+  card.querySelector('[data-a=pick]').onclick = function () { openPicker(e.category, group, idx); };
+  return card;
+}
+
+// 값을 input으로 바꿔 그 자리에서 수정
+function editElement(group, idx, card) {
+  const inp = document.createElement("input");
+  inp.className = "eledit"; inp.value = EDIT[group][idx].value;
+  inp.onkeydown = function (ev) { if (ev.key === "Enter") commit(); };
+  inp.onblur = commit;
+  function commit() { EDIT[group][idx].value = inp.value; renderEdit(); }
+  card.querySelector(".elval").replaceWith(inp); inp.focus();
+}
+
+// 카드 묶음을 다시 그린다
+function renderEdit() {
+  const box = document.getElementById("elbox");
+  if (!box) return;
+  box.innerHTML = "";
+  EDIT.fixed.forEach(function (_, i) { box.appendChild(elCard("fixed", i)); });
+  EDIT.variable.forEach(function (_, i) { box.appendChild(elCard("variable", i)); });
+  wireElDrag(box);
+}
+
+// 같은 그룹(fixed/variable) 안에서만 드래그로 순서 바꾸기
+function wireElDrag(box) {
+  let dragEl = null;
+  box.querySelectorAll(".elcard").forEach(function (c) {
+    c.addEventListener("dragstart", function () { dragEl = c; c.classList.add("dragging"); });
+    c.addEventListener("dragend", function () {
+      c.classList.remove("dragging");
+      // 화면 순서대로 EDIT 배열을 다시 만든다(그룹별)
+      ["fixed", "variable"].forEach(function (g) {
+        const order = [].filter.call(box.querySelectorAll('.elcard[data-group=' + g + ']'), function () { return true; });
+        EDIT[g] = order.map(function (el) { return EDIT[g][Number(el.dataset.idx)]; });
+      });
+      renderEdit();
+    });
+    c.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      if (!dragEl || dragEl === c || dragEl.dataset.group !== c.dataset.group) return;
+      const r = c.getBoundingClientRect();
+      const before = e.clientY < r.top + r.height / 2;
+      box.insertBefore(dragEl, before ? c : c.nextSibling);
+    });
+  });
+}
+
+// 편집된 요소를 서버에 저장
+function saveModule() {
+  fetch("/api/module/update", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dir: EDIT.dir, fixedElements: EDIT.fixed, variableElements: EDIT.variable }),
+  }).then(function (r) { return r.json(); })
+    .then(function (d) { alert(d && d.ok ? "저장됐어요 😺" : "저장 실패 😿"); })
+    .catch(function () { alert("저장 실패 😿"); });
+}
+
+// B2에서 채운다(라이브러리 피커)
+function openPicker() {}
 </script>
 </body>
 </html>`;
