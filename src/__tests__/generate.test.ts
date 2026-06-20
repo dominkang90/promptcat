@@ -46,7 +46,7 @@ describe("generateForModule", () => {
       now: new Date(2026, 0, 2, 3, 4, 5),
     });
 
-    expect(provider.lastPrompt).toBe("일러스트, 강아지");
+    expect(provider.lastPrompt).toBe("일러스트, 반드시 반영: 강아지, 강아지 그림");
     expect(res.files.length).toBe(1);
     expect(res.files[0]).toMatch(/^gen-.*\.png$/);
 
@@ -84,7 +84,7 @@ describe("generateForModule", () => {
       translate: async (t) => `EN(${t})`,
       now: new Date(2026, 0, 2, 3, 4, 5),
     });
-    expect(provider.lastPrompt).toBe("EN(일러스트, 강아지)");
-    expect(res.prompt).toBe("EN(일러스트, 강아지)");
+    expect(provider.lastPrompt).toBe("EN(일러스트, 반드시 반영: 강아지, 강아지 그림)");
+    expect(res.prompt).toBe("EN(일러스트, 반드시 반영: 강아지, 강아지 그림)");
   });
 });

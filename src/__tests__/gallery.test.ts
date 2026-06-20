@@ -39,7 +39,7 @@ describe("renderGallery", () => {
     const withGen: ModuleEntry = { ...entry, generatedImages: ["gen-20260616-050000.png"] };
     const html = renderGallery([withGen]);
     expect(html).toContain("이미지 생성"); // 🎨 버튼 문구 (클라이언트 JS 안에 포함)
-    expect(html).toContain("data-var"); // 변동요소 입력칸을 만드는 setAttribute 코드
+    expect(html).toContain("selectedIds"); // 체크된 요소 id를 모아 생성에 전달
     expect(html).toContain("/generate"); // 생성 요청 경로
     expect(html).toContain("gen-20260616-050000.png"); // 생성물 파일명(임베드 데이터에 포함)
   });
@@ -97,6 +97,15 @@ describe("renderGallery", () => {
     expect(html).toContain("function openPicker");
     expect(html).toContain("/api/elements?category=");
     expect(html).toContain("/api/elements/meta");
+  });
+
+  it("포함 체크칸·선택 영역·변동요소 추가 JS 훅이 렌더링된다", () => {
+    const html = renderGallery([]);
+    expect(html).toContain("function addVariable");
+    expect(html).toContain('data-a="inc"'); // 모든 요소의 포함 체크칸
+    expect(html).toContain("selbox"); // 선택 영역(체크된 것만 쌓임)
+    expect(html).toContain("변동요소 추가");
+    expect(html).toContain("selection: selectedIds()"); // 생성 시 체크된 요소만 전달
   });
 
   it("렌더된 인라인 스크립트에 문법 오류가 없다", () => {

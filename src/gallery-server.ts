@@ -54,10 +54,11 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
 
       if (req.method === "POST" && url.pathname === "/generate") {
         try {
-          const { dir, overrides, backend } = JSON.parse(await readBody(req)) as {
+          const { dir, overrides, backend, selection } = JSON.parse(await readBody(req)) as {
             dir: string;
             overrides?: Record<string, string>;
             backend?: string;
+            selection?: string[];
           };
           const moduleRoot = path.resolve(root, dir);
           if (moduleRoot !== root && !moduleRoot.startsWith(root + path.sep)) {
@@ -77,6 +78,7 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
             provider,
             count: config.imageCount,
             translate: (t) => translateFn(t, config),
+            selection,
           });
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify(result));

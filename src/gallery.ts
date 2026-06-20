@@ -101,7 +101,15 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .eledit { width:100%; padding:6px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
   .elbtns { margin-top:4px; display:flex; gap:6px; }
   .elbtns button { border:1px solid #ddd; background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; }
+  .elinc { font-size:11px; color:#c0689a; display:inline-flex; align-items:center; gap:3px; margin-right:auto; }
   .saveModule { background:#ff8fab; color:#fff; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; }
+  .addVar { margin-left:8px; background:#fff; color:#c0689a; border:1px solid #ff8fab; padding:10px 16px; border-radius:6px; cursor:pointer; }
+  .seltitle { font-size:13px; font-weight:600; color:#555; margin:14px 0 6px; }
+  #selbox { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+  .selrow { display:flex; align-items:center; gap:8px; }
+  .selk { flex:0 0 90px; font-size:12px; color:#888; word-break:keep-all; }
+  .selrow .eledit { flex:1; }
+  .selempty { font-size:12px; color:#bbb; padding:4px 0; }
   /* 라이브러리 피커 */
   #picker .sheet { max-width:560px; }
   #pickerSearch { width:100%; padding:8px; margin:8px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
@@ -251,31 +259,27 @@ function openDetail(i) {
   const h2 = document.createElement("h2"); h2.textContent = m.result.imageType; sheet.appendChild(h2);
   addRow(sheet, "전체", m.result.fullPrompt);
 
-  // 편집용 요소 상태를 MODULES[i]에서 복제(원본 안 건드리게)
+  // 편집용 요소 상태를 MODULES[i]에서 복제(원본 안 건드리게). checked: 생성에 포함할지(기본 전부 체크)
   EDIT = {
     dir: m.dir,
-    fixed: m.result.fixedElements.map(function (e) { return { id: e.id, category: e.category, value: e.value }; }),
-    variable: m.result.variableElements.map(function (e) { return { id: e.id, category: e.category, value: e.value, placeholder: e.placeholder }; }),
+    fixed: m.result.fixedElements.map(function (e) { return { id: e.id, category: e.category, value: e.value, checked: true }; }),
+    variable: m.result.variableElements.map(function (e) { return { id: e.id, category: e.category, value: e.value, placeholder: e.placeholder, checked: true }; }),
   };
   const elbox = document.createElement("div"); elbox.id = "elbox"; sheet.appendChild(elbox);
   const saveBtn = document.createElement("button");
   saveBtn.className = "saveModule"; saveBtn.textContent = "💾 저장";
   saveBtn.addEventListener("click", saveModule);
   sheet.appendChild(saveBtn);
-  renderEdit();
+  const addVarBtn = document.createElement("button");
+  addVarBtn.className = "addVar"; addVarBtn.textContent = "➕ 변동요소 추가";
+  addVarBtn.addEventListener("click", addVariable);
+  sheet.appendChild(addVarBtn);
 
-  // 변동요소: 🎨 생성용 수정 입력칸(요소 카드와 별개로 한 번 그리기용 override 입력)
-  const inputs = {};
-  m.result.variableElements.forEach(function (e) {
-    const wrap = document.createElement("div"); wrap.className = "row";
-    const k = document.createElement("div"); k.className = "k"; k.textContent = "↳ " + e.category;
-    const inp = document.createElement("input");
-    inp.setAttribute("data-var", e.id);
-    inp.value = e.value;
-    inp.style.cssText = "flex:1;padding:6px;border:1px solid #ddd;border-radius:6px";
-    inputs[e.id] = inp;
-    wrap.append(k, inp); sheet.appendChild(wrap);
-  });
+  // 선택 영역: 체크된 요소만 쌓여서 여기서 값 수정 → 생성에 그대로 반영
+  const seltitle = document.createElement("div"); seltitle.className = "seltitle"; seltitle.textContent = "✅ 생성에 쓸 요소 (체크된 것만)";
+  sheet.appendChild(seltitle);
+  const selbox = document.createElement("div"); selbox.id = "selbox"; sheet.appendChild(selbox);
+  renderEdit();
 
   // 백엔드 선택 + 🎨 생성 + AI 스튜디오
   const tools = document.createElement("div"); tools.className = "row";
@@ -295,13 +299,21 @@ function openDetail(i) {
   const existing = imgStrip(m.dir, m.generatedImages || []);
   if (existing) result.appendChild(existing);
 
+  // 체크된 요소 id 목록(생성에 포함). 유형은 서버가 항상 앞에 붙인다.
+  function selectedIds() {
+    return EDIT.fixed.concat(EDIT.variable).filter(function (e) { return e.checked; }).map(function (e) { return e.id; });
+  }
+  // 체크된 요소 우선 + 전체 프롬프트(빈칸 채움) — 백엔드 조립과 동일 규칙(스튜디오 복사용)
   function assemble() {
-    let out = m.result.fullPrompt;
-    m.result.variableElements.forEach(function (e) {
-      const v = (inputs[e.id].value || "").trim() || e.value;
-      out = out.split(e.placeholder).join(v);
-    });
-    return out;
+    const checked = EDIT.fixed.concat(EDIT.variable)
+      .filter(function (e) { return e.checked && (e.value || "").trim(); })
+      .map(function (e) { return e.value.trim(); });
+    let full = m.result.fullPrompt || "";
+    EDIT.variable.forEach(function (e) { if (e.placeholder) full = full.split(e.placeholder).join((e.value || "").trim()); });
+    const segs = [m.result.imageType];
+    if (checked.length) segs.push("반드시 반영: " + checked.join(", "));
+    if (full.trim()) segs.push(full.trim());
+    return segs.filter(Boolean).join(", ");
   }
 
   studioBtn.addEventListener("click", function () {
@@ -310,14 +322,17 @@ function openDetail(i) {
   });
 
   genBtn.addEventListener("click", async function () {
-    const overrides = {};
-    Object.keys(inputs).forEach(function (id) { overrides[id] = inputs[id].value; });
     genBtn.disabled = true; genBtn.textContent = "그리는 중... 🐱";
     try {
+      // 수정한 값이 반영되도록 먼저 저장한 뒤, 체크된 요소만으로 생성한다
+      await fetch("/api/module/update", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: EDIT.dir, fixedElements: EDIT.fixed, variableElements: EDIT.variable }),
+      });
       const res = await fetch("/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dir: m.dir, overrides: overrides, backend: backendSel.value }),
+        body: JSON.stringify({ dir: m.dir, backend: backendSel.value, selection: selectedIds() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "실패");
@@ -350,14 +365,30 @@ function elCard(group, idx) {
   const card = document.createElement("div");
   card.className = "elcard"; card.draggable = true;
   card.dataset.group = group; card.dataset.idx = idx;
+  var ph = group === "variable" ? ' <span class="ph">' + escapeHtmlJs(e.placeholder || "") + "</span>" : "";
+  // 포함 체크칸: 체크된 요소만 생성에 쓰인다(기본 체크)
+  var inc = '<label class="elinc"><input type="checkbox" data-a="inc"' + (e.checked ? " checked" : "") + "> 포함</label>";
   card.innerHTML =
-    '<div class="elcat">' + escapeHtmlJs(e.category) + (group === "variable" ? ' <span class="ph">' + escapeHtmlJs(e.placeholder || "") + "</span>" : "") + "</div>" +
+    '<div class="elcat">' + escapeHtmlJs(e.category) + ph + "</div>" +
     '<div class="elval">' + escapeHtmlJs(e.value) + "</div>" +
-    '<div class="elbtns"><button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>';
+    '<div class="elbtns">' + inc + '<button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>';
   card.querySelector('[data-a=edit]').onclick = function () { editElement(group, idx, card); };
   card.querySelector('[data-a=del]').onclick = function () { EDIT[group].splice(idx, 1); renderEdit(); };
   card.querySelector('[data-a=pick]').onclick = function () { openPicker(e.category, group, idx); };
+  card.querySelector('[data-a=inc]').onchange = function () { EDIT[group][idx].checked = this.checked; renderEdit(); };
   return card;
+}
+
+// 선택 영역의 한 줄(체크된 요소): 카테고리 + 그 자리에서 값 수정
+function selRow(group, idx) {
+  const e = EDIT[group][idx];
+  const row = document.createElement("div"); row.className = "selrow";
+  const k = document.createElement("div"); k.className = "selk"; k.textContent = e.category;
+  const inp = document.createElement("input");
+  inp.className = "eledit"; inp.value = e.value;
+  inp.oninput = function () { EDIT[group][idx].value = inp.value; };
+  row.append(k, inp);
+  return row;
 }
 
 // 값을 input으로 바꿔 그 자리에서 수정
@@ -370,7 +401,7 @@ function editElement(group, idx, card) {
   card.querySelector(".elval").replaceWith(inp); inp.focus();
 }
 
-// 카드 묶음을 다시 그린다
+// 카드 묶음 + 선택 영역을 다시 그린다
 function renderEdit() {
   const box = document.getElementById("elbox");
   if (!box) return;
@@ -378,6 +409,18 @@ function renderEdit() {
   EDIT.fixed.forEach(function (_, i) { box.appendChild(elCard("fixed", i)); });
   EDIT.variable.forEach(function (_, i) { box.appendChild(elCard("variable", i)); });
   wireElDrag(box);
+
+  // 선택 영역: 체크된 요소만 수정 가능하게 쌓아 보여준다
+  const sel = document.getElementById("selbox");
+  if (!sel) return;
+  sel.innerHTML = "";
+  EDIT.fixed.forEach(function (e, i) { if (e.checked) sel.appendChild(selRow("fixed", i)); });
+  EDIT.variable.forEach(function (e, i) { if (e.checked) sel.appendChild(selRow("variable", i)); });
+  if (!sel.children.length) {
+    const empty = document.createElement("div"); empty.className = "selempty";
+    empty.textContent = "체크된 요소가 없어요 — 유형만으로 생성돼요";
+    sel.appendChild(empty);
+  }
 }
 
 // 같은 그룹(fixed/variable) 안에서만 드래그로 순서 바꾸기
@@ -402,6 +445,16 @@ function wireElDrag(box) {
       box.insertBefore(dragEl, before ? c : c.nextSibling);
     });
   });
+}
+
+// 변동요소 새로 추가(카테고리·기본값 입력받아 슬롯 생성). 변동요소는 항상 1순위.
+function addVariable() {
+  var category = prompt("변동요소 카테고리 (예: 주인공, 포즈·동작)");
+  if (!category) return;
+  var value = prompt("기본 값 (예: 정면을 보는 인물)");
+  if (value === null) return;
+  EDIT.variable.push({ id: "new-" + Date.now(), category: category, value: value || "", placeholder: "{{" + category + "}}", checked: true });
+  renderEdit();
 }
 
 // 편집된 요소를 서버에 저장
