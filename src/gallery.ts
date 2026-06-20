@@ -1,4 +1,15 @@
 import type { ModuleEntry } from "./collection.js";
+import type { ExtractionResult } from "./schema.js";
+
+// 프롬프트에서 자동 태그를 뽑는다: 유형 + 각 요소의 종류(category). 중복 제거.
+export function tagsFor(result: ExtractionResult): string[] {
+  const raw = [
+    result.imageType,
+    ...result.fixedElements.map((e) => e.category),
+    ...result.variableElements.map((e) => e.category),
+  ];
+  return [...new Set(raw.map((s) => s.trim()).filter(Boolean))];
+}
 
 export function escapeHtml(s: string): string {
   return s
@@ -23,14 +34,24 @@ export function renderGallery(entries: ModuleEntry[]): string {
       ]
         .join(" ")
         .toLowerCase();
+      const tags = tagsFor(e.result);
+      const chips = tags.map((t) => `#${escapeHtml(t)}`).join(" ");
       const src = `/img/${encodeURIComponent(e.dir)}/${encodeURIComponent(e.imageFile)}`;
-      return `<div class="card" data-search="${escapeHtml(searchText)}" onclick="openDetail(${i})">
-  <img src="${src}" alt="">
+      return `<div class="card" draggable="true" data-dir="${escapeHtml(e.dir)}" data-search="${escapeHtml(searchText)}" data-tags="|${escapeHtml(tags.join("|"))}|" onclick="openDetail(${i})">
+  <button class="del" title="삭제" onclick="event.stopPropagation();delModule(this)">🗑️</button>
+  <img src="${src}" alt="" draggable="false">
   <div class="type">${escapeHtml(e.result.imageType)}</div>
   <div class="dir">${escapeHtml(e.dir)}</div>
+  <div class="tags">${chips}</div>
 </div>`;
     })
     .join("\n");
+
+  // 화면 위쪽 태그 버튼들 (전체 + 모든 프롬프트의 태그 모음)
+  const allTags = [...new Set(entries.flatMap((e) => tagsFor(e.result)))];
+  const tagbar = `<div class="tagbar" id="tagbar"><button class="tag active" data-tag="">전체</button>${allTags
+    .map((t) => `<button class="tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
+    .join("")}</div>`;
 
   const body = entries.length
     ? `<div class="grid" id="grid">\n${cards}\n</div>`
@@ -49,10 +70,17 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .empty img.empty-cat { width:160px; height:auto; display:block; margin:0 auto 12px; }
   #q { width:100%; padding:10px; font-size:15px; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; padding:16px; }
-  .card { background:#fff; border-radius:10px; overflow:hidden; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .card { position:relative; background:#fff; border-radius:10px; overflow:hidden; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .card.dragging { opacity:.4; }
   .card img { width:100%; height:130px; object-fit:contain; background:#f0ecea; display:block; }
   .card .type { font-weight:600; padding:6px 8px 0; }
-  .card .dir { font-size:11px; color:#999; padding:0 8px 8px; }
+  .card .dir { font-size:11px; color:#999; padding:0 8px 4px; }
+  .card .tags { font-size:10px; color:#c0689a; padding:0 8px 8px; word-break:break-all; }
+  .card .del { position:absolute; top:6px; right:6px; z-index:2; border:none; background:rgba(0,0,0,.55); color:#fff; border-radius:6px; padding:3px 7px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .12s; }
+  .card:hover .del { opacity:1; }
+  .tagbar { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .tag { border:1px solid #e3d9d4; background:#fff; color:#666; border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; }
+  .tag.active { background:#ff8fab; color:#fff; border-color:#ff8fab; }
   .empty { text-align:center; color:#999; padding:60px; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; padding:20px; }
   .modal.open { display:flex; }
@@ -69,6 +97,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 <header>
   <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션</h1>
   <input id="q" placeholder="🔍 검색 (유형·단어)">
+  ${tagbar}
 </header>
 ${body}
 
@@ -81,12 +110,67 @@ const MODULES = ${data};
 let DEFAULT_BACKEND = "pollinations";
 fetch("/api/config").then(function (r) { return r.json(); }).then(function (c) { if (c && c.imageBackend) DEFAULT_BACKEND = c.imageBackend; }).catch(function () {});
 
-document.getElementById("q").addEventListener("input", function () {
-  const t = this.value.trim().toLowerCase();
+// 검색어 + 선택한 태그를 함께 적용해서 카드를 거른다
+let currentTag = "";
+function applyFilter() {
+  const t = (document.getElementById("q").value || "").trim().toLowerCase();
   document.querySelectorAll(".card").forEach(function (c) {
-    c.style.display = !t || c.dataset.search.indexOf(t) !== -1 ? "" : "none";
+    const okText = !t || c.dataset.search.indexOf(t) !== -1;
+    const okTag = !currentTag || c.dataset.tags.indexOf("|" + currentTag + "|") !== -1;
+    c.style.display = okText && okTag ? "" : "none";
+  });
+}
+document.getElementById("q").addEventListener("input", applyFilter);
+document.querySelectorAll("#tagbar .tag").forEach(function (b) {
+  b.addEventListener("click", function () {
+    currentTag = this.dataset.tag;
+    document.querySelectorAll("#tagbar .tag").forEach(function (x) { x.classList.remove("active"); });
+    this.classList.add("active");
+    applyFilter();
   });
 });
+
+// 삭제: 확인 후 서버에 지우고 카드 제거
+function delModule(btn) {
+  const card = btn.closest(".card");
+  if (!confirm("이 프롬프트를 삭제할까요? 되돌릴 수 없어요 😿")) return;
+  fetch("/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dir: card.dataset.dir }),
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (d && d.ok) card.remove(); else alert("삭제 실패 😿"); })
+    .catch(function () { alert("삭제 실패 😿"); });
+}
+
+// 드래그로 순서 바꾸기 → 서버에 새 순서 저장
+function saveOrder() {
+  const grid = document.getElementById("grid");
+  if (!grid) return;
+  const order = [].map.call(grid.querySelectorAll(".card"), function (c) { return c.dataset.dir; });
+  fetch("/reorder", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ order: order }),
+  }).catch(function () {});
+}
+(function () {
+  const grid = document.getElementById("grid");
+  if (!grid) return;
+  let dragEl = null;
+  grid.querySelectorAll(".card").forEach(function (c) {
+    c.addEventListener("dragstart", function () { dragEl = c; c.classList.add("dragging"); });
+    c.addEventListener("dragend", function () { c.classList.remove("dragging"); saveOrder(); });
+    c.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      if (!dragEl || dragEl === c) return;
+      const r = c.getBoundingClientRect();
+      const before = e.clientY < r.top + r.height / 2 || (e.clientY < r.bottom && e.clientX < r.left + r.width / 2);
+      grid.insertBefore(dragEl, before ? c : c.nextSibling);
+    });
+  });
+})();
 
 document.getElementById("modal").addEventListener("click", function (e) {
   if (e.target === this) closeDetail();

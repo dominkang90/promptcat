@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, renderGallery } from "../gallery.js";
+import { escapeHtml, renderGallery, tagsFor } from "../gallery.js";
 import type { ModuleEntry } from "../collection.js";
 
 const entry: ModuleEntry = {
@@ -59,6 +59,24 @@ describe("renderGallery", () => {
   it("헤더와 빈 화면에 DeskCat 마스코트 이미지를 쓴다", () => {
     expect(renderGallery([entry])).toContain('src="/mascot.png"'); // 헤더 로고
     expect(renderGallery([])).toContain('src="/mascot.png"'); // 빈 화면 마스코트
+  });
+
+  it("자동 태그: 유형+요소종류로 만들고 태그바·카드에 담는다", () => {
+    expect(tagsFor(entry.result)).toEqual(["제품", "조명", "주인공"]);
+    const html = renderGallery([entry]);
+    expect(html).toContain('class="tagbar"');
+    expect(html).toContain("전체"); // 태그바의 전체 버튼
+    expect(html).toContain('data-tags="|제품|조명|주인공|"'); // 카드의 태그 데이터
+  });
+
+  it("카드에 호버 삭제버튼과 드래그 속성을 담는다", () => {
+    const html = renderGallery([entry]);
+    expect(html).toContain('class="del"'); // 삭제 버튼
+    expect(html).toContain("delModule"); // 삭제 함수 호출
+    expect(html).toContain("/delete"); // 삭제 요청 경로
+    expect(html).toContain('draggable="true"'); // 드래그 가능
+    expect(html).toContain("data-dir="); // 어떤 폴더인지
+    expect(html).toContain("/reorder"); // 순서 저장 경로
   });
 
   it("스크립트 깨짐 방지로 < 를 이스케이프한다", () => {

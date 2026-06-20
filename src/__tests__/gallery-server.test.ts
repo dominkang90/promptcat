@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
@@ -142,6 +142,51 @@ describe("createGalleryServer", () => {
       const cfg = (await got.json()) as { imageCount: number; geminiApiKey: string };
       expect(cfg.imageCount).toBe(3);
       expect(cfg.geminiApiKey).toBe("****4242"); // 마스킹 + 유지
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /delete 는 모듈 폴더를 지우고, 폴더 밖 경로는 거부한다", async () => {
+    await setup();
+    const server = createGalleryServer(base);
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const bad = await fetch(`http://localhost:${port}/delete`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "../../etc" }),
+      });
+      expect(bad.status).toBe(403);
+
+      const ok = await fetch(`http://localhost:${port}/delete`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "product-20260101-000000" }),
+      });
+      expect(ok.status).toBe(200);
+      const home = await fetch(`http://localhost:${port}/`);
+      expect(await home.text()).not.toContain("product-20260101-000000"); // 목록에서 사라짐
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /reorder 는 .order.json 에 순서를 저장한다", async () => {
+    await setup();
+    const server = createGalleryServer(base);
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/reorder`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order: ["product-20260101-000000"] }),
+      });
+      expect(res.status).toBe(200);
+      const saved = JSON.parse(await readFile(path.join(base, ".order.json"), "utf8"));
+      expect(saved).toEqual(["product-20260101-000000"]);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }

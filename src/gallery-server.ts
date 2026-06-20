@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listModules } from "./collection.js";
@@ -79,6 +79,38 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
           });
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/delete") {
+        try {
+          const { dir } = JSON.parse(await readBody(req)) as { dir: string };
+          const full = path.resolve(root, dir);
+          if (full === root || !full.startsWith(root + path.sep)) {
+            res.writeHead(403, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: "forbidden" }));
+            return;
+          }
+          await rm(full, { recursive: true, force: true });
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/reorder") {
+        try {
+          const { order } = JSON.parse(await readBody(req)) as { order: string[] };
+          await writeFile(path.join(root, ".order.json"), JSON.stringify(order), "utf8");
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
         } catch (e) {
           res.writeHead(500, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));

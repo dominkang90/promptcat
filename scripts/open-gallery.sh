@@ -8,10 +8,12 @@ PORT=4517
 up() { (exec 3<>"/dev/tcp/localhost/$PORT") 2>/dev/null; }
 
 if ! up; then
-  nohup npm run --silent gallery >/tmp/promptcat-gallery.log 2>&1 &
-  for _ in $(seq 1 30); do
+  # setsid 로 완전히 독립된 세션에 띄운다. 안 그러면 펫의 wsl 명령이 끝날 때 서버도 같이 죽는다.
+  setsid npm run --silent gallery >/tmp/promptcat-gallery.log 2>&1 </dev/null &
+  # 처음 WSL이 깨어날 땐 tsx 시동에 시간이 걸려서 넉넉히(최대 30초) 기다린다
+  for _ in $(seq 1 60); do
     up && break
-    sleep 0.3
+    sleep 0.5
   done
 fi
 

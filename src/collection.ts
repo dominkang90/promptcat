@@ -17,6 +17,16 @@ function stampKey(dir: string): string {
   return m ? m[1] : dir;
 }
 
+// 사용자가 드래그로 바꾼 순서. baseDir/.order.json 에 폴더이름 배열로 저장된다.
+async function readOrder(baseDir: string): Promise<string[]> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(path.join(baseDir, ".order.json"), "utf8"));
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
   let dirents;
   try {
@@ -48,5 +58,14 @@ export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
   }
 
   entries.sort((a, b) => stampKey(b.dir).localeCompare(stampKey(a.dir)));
+
+  // 저장된 수동 순서가 있으면 그대로 따른다. 목록에 없는(새로 생긴) 건 맨 앞(최신).
+  const order = await readOrder(baseDir);
+  if (order.length) {
+    const rank = new Map(order.map((d, i) => [d, i]));
+    const inList = entries.filter((e) => rank.has(e.dir)).sort((a, b) => rank.get(a.dir)! - rank.get(b.dir)!);
+    const notInList = entries.filter((e) => !rank.has(e.dir)); // 이미 최신순 정렬됨
+    return [...notInList, ...inList];
+  }
   return entries;
 }

@@ -44,6 +44,21 @@ describe("listModules", () => {
     expect(list[0].generatedImages).toEqual([]);
   });
 
+  it(".order.json 순서를 따르고, 목록에 없는 새 모듈은 맨 앞에 둔다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-col-"));
+    await makeModule("가-20260616-010000");
+    await makeModule("나-20260616-020000");
+    await makeModule("다-20260616-030000"); // 가장 최신, 순서파일엔 없음
+    // 가, 나를 거꾸로(나 먼저) 저장. 다는 목록에 없음.
+    await writeFile(path.join(base, ".order.json"), JSON.stringify(["나-20260616-020000", "가-20260616-010000"]), "utf8");
+    const list = await listModules(base);
+    expect(list.map((e) => e.dir)).toEqual([
+      "다-20260616-030000", // 목록에 없는 새것 → 맨 앞(최신)
+      "나-20260616-020000",
+      "가-20260616-010000",
+    ]);
+  });
+
   it("gen-* 이미지는 generatedImages로, 썸네일은 원본으로 잡는다", async () => {
     base = await mkdtemp(path.join(tmpdir(), "promptcat-col-"));
     const d = path.join(base, "제품-20260616-040114");
