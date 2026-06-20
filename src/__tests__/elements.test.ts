@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { aggregateElements, filterElements, elementKey, readElementsMeta, writeElementMeta } from "../elements.js";
+import { mkdir, readFile } from "node:fs/promises";
+import { aggregateElements, filterElements, elementKey, readElementsMeta, writeElementMeta, updateModuleElements } from "../elements.js";
 import type { ModuleEntry } from "../collection.js";
 
 function mod(dir: string, fixed: [string, string][], variable: [string, string, string][] = []): ModuleEntry {
@@ -66,5 +67,28 @@ describe("meta 읽기/쓰기", () => {
   it("파일 없으면 빈 객체", async () => {
     base = await mkdtemp(path.join(tmpdir(), "pc-meta-"));
     expect(await readElementsMeta(base)).toEqual({});
+  });
+});
+
+describe("updateModuleElements", () => {
+  let base = "";
+  afterEach(async () => { if (base) await rm(base, { recursive: true, force: true }); });
+  it("prompt.json의 요소 배열을 통째로 바꿔 저장한다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "pc-upd-"));
+    const dir = "인물-20260101-000000";
+    await mkdir(path.join(base, dir), { recursive: true });
+    const orig = { imageType: "인물", fullPrompt: "원본", fixedElements: [], variableElements: [], negativePrompt: "", notes: "메모" };
+    await writeFile(path.join(base, dir, "prompt.json"), JSON.stringify(orig), "utf8");
+
+    await updateModuleElements(base, dir,
+      [{ id: "f0", category: "구도", value: "로우앵글" }],
+      [{ id: "v0", category: "주인공", value: "강아지", placeholder: "{{인물}}" }],
+    );
+
+    const saved = JSON.parse(await readFile(path.join(base, dir, "prompt.json"), "utf8"));
+    expect(saved.fixedElements[0].value).toBe("로우앵글");
+    expect(saved.variableElements[0].value).toBe("강아지");
+    expect(saved.imageType).toBe("인물"); // 나머지 필드 보존
+    expect(saved.notes).toBe("메모");
   });
 });

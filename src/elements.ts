@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ModuleEntry } from "./collection.js";
+import { extractionResultSchema, type FixedElement, type VariableElement } from "./schema.js";
 
 const META_FILE = ".elements-meta.json";
 
@@ -87,4 +88,17 @@ export function filterElements(all: LibraryElement[], query: ListElementsQuery):
     (a, b) =>
       Number(b.favorite) - Number(a.favorite) || a.order - b.order || a.value.localeCompare(b.value),
   );
+}
+
+// 편집 팝업에서 바뀐 요소 배열을 prompt.json에 통째로 덮어쓴다. 나머지 필드는 그대로 둔다.
+export async function updateModuleElements(
+  baseDir: string,
+  dir: string,
+  fixedElements: FixedElement[],
+  variableElements: VariableElement[],
+): Promise<void> {
+  const file = path.join(baseDir, dir, "prompt.json");
+  const current = extractionResultSchema.parse(JSON.parse(await readFile(file, "utf8")));
+  const updated = extractionResultSchema.parse({ ...current, fixedElements, variableElements });
+  await writeFile(file, JSON.stringify(updated, null, 2), "utf8");
 }
