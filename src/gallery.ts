@@ -353,7 +353,7 @@ function elCard(group, idx) {
   card.innerHTML =
     '<div class="elcat">' + escapeHtmlJs(e.category) + (group === "variable" ? ' <span class="ph">' + escapeHtmlJs(e.placeholder || "") + "</span>" : "") + "</div>" +
     '<div class="elval">' + escapeHtmlJs(e.value) + "</div>" +
-    '<div class="elbtns"><button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>";
+    '<div class="elbtns"><button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>';
   card.querySelector('[data-a=edit]').onclick = function () { editElement(group, idx, card); };
   card.querySelector('[data-a=del]').onclick = function () { EDIT[group].splice(idx, 1); renderEdit(); };
   card.querySelector('[data-a=pick]').onclick = function () { openPicker(e.category, group, idx); };
@@ -431,7 +431,7 @@ function openPicker(category, group, idx) {
             '<div class="pkthumbs">' + (el.sources || []).slice(0, 4).map(function (s) {
               return '<span class="pkdir">' + escapeHtmlJs(s) + "</span>"; }).join("") + "</div>" +
             '<div class="pkval">' + escapeHtmlJs(el.value) + "</div>" +
-            '<div class="pkbtns"><button data-a="fav">' + (el.favorite ? "★" : "☆") + '</button><button data-a="hide">👁</button><button data-a="use">사용</button></div>";
+            '<div class="pkbtns"><button data-a="fav">' + (el.favorite ? "★" : "☆") + '</button><button data-a="hide">👁</button><button data-a="use">사용</button></div>';
           item.querySelector('[data-a=use]').onclick = function () { choose(el); };
           item.querySelector('[data-a=fav]').onclick = function () { meta(el.key, { favorite: !el.favorite }); };
           item.querySelector('[data-a=hide]').onclick = function () { meta(el.key, { hidden: true }); };

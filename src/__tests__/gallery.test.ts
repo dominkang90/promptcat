@@ -98,4 +98,12 @@ describe("renderGallery", () => {
     expect(html).toContain("/api/elements?category=");
     expect(html).toContain("/api/elements/meta");
   });
+
+  it("렌더된 인라인 스크립트에 문법 오류가 없다", () => {
+    const html = renderGallery([entry]);
+    const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    const js = blocks.sort((a, b) => b.length - a.length)[0]; // 가장 긴 = 메인 인라인 JS
+    // new Function 은 본문을 "파싱"만 한다(실행 X). 문법 오류면 SyntaxError 를 던진다.
+    expect(() => new Function(js)).not.toThrow();
+  });
 });
