@@ -192,6 +192,51 @@ describe("createGalleryServer", () => {
     }
   });
 
+  it("/api/elements 는 집계된 요소를, /api/module/update 는 저장을 한다", async () => {
+    await setup(); // product-... 모듈 1개(요소 없음) 존재
+    const server = createGalleryServer(base);
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      // 요소 추가 저장
+      const upd = await fetch(`http://localhost:${port}/api/module/update`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "product-20260101-000000", fixedElements: [{ id: "f0", category: "구도", value: "정면" }], variableElements: [] }),
+      });
+      expect(upd.status).toBe(200);
+
+      // 집계 조회
+      const list = await (await fetch(`http://localhost:${port}/api/elements?category=구도`)).json();
+      expect(list.map((e: { value: string }) => e.value)).toContain("정면");
+
+      // 메타: 숨김 처리하면 기본 조회에서 빠진다
+      await fetch(`http://localhost:${port}/api/elements/meta`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: "구도|정면", hidden: true }),
+      });
+      const after = await (await fetch(`http://localhost:${port}/api/elements?category=구도`)).json();
+      expect(after).toHaveLength(0);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("/api/module/update 경로 탈출은 403", async () => {
+    await setup();
+    const server = createGalleryServer(base);
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const r = await fetch(`http://localhost:${port}/api/module/update`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dir: "../escape", fixedElements: [], variableElements: [] }),
+      });
+      expect(r.status).toBe(403);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it("GET /mascot.png 는 마스코트 이미지를 준다", async () => {
     base = await mkdtemp(path.join(tmpdir(), "promptcat-mascot-"));
     const server = createGalleryServer(base);

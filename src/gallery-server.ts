@@ -9,6 +9,7 @@ import { renderSettings } from "./gallery-settings.js";
 import { generateForModule } from "./generate.js";
 import { translateToEnglish } from "./translate.js";
 import { GeminiImageProvider, PollinationsImageProvider, type ImageProvider } from "./image-provider.js";
+import { aggregateElements, filterElements, readElementsMeta, writeElementMeta, updateModuleElements } from "./elements.js";
 
 const PORT = 4517;
 
@@ -109,6 +110,50 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
         try {
           const { order } = JSON.parse(await readBody(req)) as { order: string[] };
           await writeFile(path.join(root, ".order.json"), JSON.stringify(order), "utf8");
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/elements") {
+        const meta = await readElementsMeta(baseDir);
+        const all = aggregateElements(await listModules(baseDir), meta);
+        const list = filterElements(all, {
+          category: url.searchParams.get("category") ?? undefined,
+          q: url.searchParams.get("q") ?? undefined,
+          includeHidden: url.searchParams.get("includeHidden") === "1",
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(list));
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/elements/meta") {
+        const { key, favorite, hidden, order } = JSON.parse(await readBody(req)) as {
+          key: string; favorite?: boolean; hidden?: boolean; order?: number;
+        };
+        await writeElementMeta(baseDir, key, { favorite, hidden, order });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/module/update") {
+        try {
+          const { dir, fixedElements, variableElements } = JSON.parse(await readBody(req)) as {
+            dir: string; fixedElements: unknown[]; variableElements: unknown[];
+          };
+          const full = path.resolve(root, dir);
+          if (full === root || !full.startsWith(root + path.sep)) {
+            res.writeHead(403, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: "forbidden" }));
+            return;
+          }
+          await updateModuleElements(baseDir, dir, fixedElements as never, variableElements as never);
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (e) {
