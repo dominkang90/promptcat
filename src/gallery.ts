@@ -93,7 +93,8 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .close { float:right; border:none; background:none; font-size:22px; cursor:pointer; line-height:1; }
   /* 편집 팝업의 요소 카드 */
   #elbox { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
-  .elcard { border:1px solid #eee; border-radius:8px; padding:8px 10px; background:#fbf8f7; cursor:grab; }
+  .elcard { border:2px solid #eee; border-radius:8px; padding:8px 10px; background:#fbf8f7; cursor:pointer; transition:border-color .12s, background .12s; }
+  .elcard.on { border-color:#ff8fab; background:#fff0f5; box-shadow:0 1px 4px rgba(255,143,171,.35); }
   .elcard.dragging { opacity:.4; }
   .elcat { font-size:12px; color:#888; margin-bottom:2px; }
   .elcat .ph { color:#c0689a; }
@@ -101,7 +102,9 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .eledit { width:100%; padding:6px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
   .elbtns { margin-top:4px; display:flex; gap:6px; }
   .elbtns button { border:1px solid #ddd; background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; }
-  .elinc { font-size:11px; color:#c0689a; display:inline-flex; align-items:center; gap:3px; margin-right:auto; }
+  .elstate { font-size:11px; margin-right:auto; align-self:center; }
+  .elcard.on .elstate { color:#c0689a; font-weight:600; }
+  .elcard:not(.on) .elstate { color:#bbb; }
   .saveModule { background:#ff8fab; color:#fff; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; }
   .addVar { margin-left:8px; background:#fff; color:#c0689a; border:1px solid #ff8fab; padding:10px 16px; border-radius:6px; cursor:pointer; }
   .seltitle { font-size:13px; font-weight:600; color:#555; margin:14px 0 6px; }
@@ -363,19 +366,23 @@ let EDIT = null;
 function elCard(group, idx) {
   const e = EDIT[group][idx];
   const card = document.createElement("div");
-  card.className = "elcard"; card.draggable = true;
+  card.className = "elcard" + (e.checked ? " on" : ""); card.draggable = true;
   card.dataset.group = group; card.dataset.idx = idx;
   var ph = group === "variable" ? ' <span class="ph">' + escapeHtmlJs(e.placeholder || "") + "</span>" : "";
-  // 포함 체크칸: 체크된 요소만 생성에 쓰인다(기본 체크)
-  var inc = '<label class="elinc"><input type="checkbox" data-a="inc"' + (e.checked ? " checked" : "") + "> 포함</label>";
+  // 카드 전체를 누르면 적용/해제 토글. 적용된 요소만 생성에 쓰인다(기본 적용)
+  var state = '<span class="elstate">' + (e.checked ? "✓ 적용됨" : "클릭해서 적용") + "</span>";
   card.innerHTML =
     '<div class="elcat">' + escapeHtmlJs(e.category) + ph + "</div>" +
     '<div class="elval">' + escapeHtmlJs(e.value) + "</div>" +
-    '<div class="elbtns">' + inc + '<button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>';
+    '<div class="elbtns">' + state + '<button data-a="edit">✏️</button><button data-a="pick">🔄</button><button data-a="del">🗑️</button></div>';
   card.querySelector('[data-a=edit]').onclick = function () { editElement(group, idx, card); };
   card.querySelector('[data-a=del]').onclick = function () { EDIT[group].splice(idx, 1); renderEdit(); };
   card.querySelector('[data-a=pick]').onclick = function () { openPicker(e.category, group, idx); };
-  card.querySelector('[data-a=inc]').onchange = function () { EDIT[group][idx].checked = this.checked; renderEdit(); };
+  // 버튼·입력창이 아닌 카드 영역을 누르면 적용 토글
+  card.onclick = function (ev) {
+    if (ev.target.closest("button") || ev.target.closest("input")) return;
+    EDIT[group][idx].checked = !EDIT[group][idx].checked; renderEdit();
+  };
   return card;
 }
 

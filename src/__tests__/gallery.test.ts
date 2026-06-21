@@ -99,10 +99,10 @@ describe("renderGallery", () => {
     expect(html).toContain("/api/elements/meta");
   });
 
-  it("포함 체크칸·선택 영역·변동요소 추가 JS 훅이 렌더링된다", () => {
+  it("박스 토글·선택 영역·변동요소 추가 JS 훅이 렌더링된다", () => {
     const html = renderGallery([]);
     expect(html).toContain("function addVariable");
-    expect(html).toContain('data-a="inc"'); // 모든 요소의 포함 체크칸
+    expect(html).toContain("elstate"); // 카드 클릭 토글 상태 표시(✓ 적용됨)
     expect(html).toContain("selbox"); // 선택 영역(체크된 것만 쌓임)
     expect(html).toContain("변동요소 추가");
     expect(html).toContain("selection: selectedIds()"); // 생성 시 체크된 요소만 전달
