@@ -5,6 +5,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { createGalleryServer } from "../gallery-server.js";
 import type { ImageProvider } from "../image-provider.js";
+import type { VisionProvider } from "../providers/types.js";
 
 const good = {
   imageType: "제품",
@@ -232,6 +233,52 @@ describe("createGalleryServer", () => {
         body: JSON.stringify({ dir: "../escape", fixedElements: [], variableElements: [] }),
       });
       expect(r.status).toBe(403);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /api/extract 는 모듈을 생성하고 dir을 반환한다", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-ext-"));
+    const fakeExtractor: VisionProvider = {
+      async analyze() { return good; },
+    };
+    const server = createGalleryServer(base, { extractor: fakeExtractor });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/api/extract`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: "test.png", data: Buffer.from([0x89, 0x50]).toString("base64") }),
+      });
+      expect(res.status).toBe(200);
+      const json = (await res.json()) as { ok: boolean; dir: string };
+      expect(json.ok).toBe(true);
+      expect(json.dir).toContain("제품");
+
+      const promptJson = JSON.parse(await readFile(path.join(base, json.dir, "prompt.json"), "utf8")) as { imageType: string };
+      expect(promptJson.imageType).toBe("제품");
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it("POST /api/extract — 지원하지 않는 확장자는 500", async () => {
+    base = await mkdtemp(path.join(tmpdir(), "promptcat-ext2-"));
+    const fakeExtractor: VisionProvider = { async analyze() { return good; } };
+    const server = createGalleryServer(base, { extractor: fakeExtractor });
+    await new Promise<void>((r) => server.listen(0, r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const res = await fetch(`http://localhost:${port}/api/extract`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: "test.pdf", data: "AAAA" }),
+      });
+      expect(res.status).toBe(500);
+      const json = (await res.json()) as { error: string };
+      expect(json.error).toContain("지원하지 않는");
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }

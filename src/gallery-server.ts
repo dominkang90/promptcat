@@ -1,5 +1,6 @@
 import http from "node:http";
 import { readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listModules } from "./collection.js";
@@ -8,6 +9,10 @@ import { loadConfig, saveConfig, maskKey, clearGeminiKey, type PromptcatConfig }
 import { renderSettings } from "./gallery-settings.js";
 import { generateForModule } from "./generate.js";
 import { translateToEnglish } from "./translate.js";
+import { extractPrompt } from "./engine.js";
+import { saveModule } from "./storage.js";
+import { ClaudeCliProvider } from "./providers/claude-cli.js";
+import type { VisionProvider } from "./providers/types.js";
 import { GeminiImageProvider, PollinationsImageProvider, type ImageProvider } from "./image-provider.js";
 import { aggregateElements, filterElements, readElementsMeta, writeElementMeta, updateModuleElements } from "./elements.js";
 
@@ -22,9 +27,10 @@ const MIME: Record<string, string> = {
 };
 
 export interface GalleryServerOptions {
-  provider?: ImageProvider; // 테스트에서 가짜 provider 주입
-  configDir?: string; // promptcat-config.json 위치 (기본 ".")
-  translate?: (text: string, config: PromptcatConfig) => Promise<string>; // 테스트에서 가짜 번역 주입
+  provider?: ImageProvider;
+  configDir?: string;
+  translate?: (text: string, config: PromptcatConfig) => Promise<string>;
+  extractor?: VisionProvider; // 테스트에서 가짜 extractor 주입
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -158,6 +164,29 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
           await updateModuleElements(baseDir, dir, fixedElements as never, variableElements as never);
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/extract") {
+        try {
+          const { filename, data } = JSON.parse(await readBody(req)) as { filename: string; data: string };
+          const ext = path.extname(filename).toLowerCase();
+          if (!MIME[ext]) throw new Error("지원하지 않는 이미지 형식이야 (png, jpg, webp, gif만 가능)");
+          const tmpPath = path.join(tmpdir(), `promptcat-upload-${Date.now()}${ext}`);
+          await writeFile(tmpPath, Buffer.from(data, "base64"));
+          try {
+            const extractor = opts.extractor ?? new ClaudeCliProvider();
+            const result = await extractPrompt(tmpPath, extractor);
+            const dir = await saveModule({ imagePath: tmpPath, result, baseDir: root });
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ ok: true, dir: path.relative(root, dir) }));
+          } finally {
+            await rm(tmpPath, { force: true });
+          }
         } catch (e) {
           res.writeHead(500, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));

@@ -78,6 +78,8 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .card .tags { font-size:10px; color:#c0689a; padding:0 8px 8px; word-break:break-all; }
   .card .del { position:absolute; top:6px; right:6px; z-index:2; border:none; background:rgba(0,0,0,.55); color:#fff; border-radius:6px; padding:3px 7px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .12s; }
   .card:hover .del { opacity:1; }
+  #uploadBtn { margin-left:auto; background:#ff8fab; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; white-space:nowrap; }
+  #uploadBtn:disabled { opacity:.55; cursor:not-allowed; }
   .tagbar { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .tag { border:1px solid #e3d9d4; background:#fff; color:#666; border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; }
   .tag.active { background:#ff8fab; color:#fff; border-color:#ff8fab; }
@@ -127,7 +129,10 @@ export function renderGallery(entries: ModuleEntry[]): string {
 </head>
 <body>
 <header>
-  <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션</h1>
+  <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션
+    <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+    <button id="uploadBtn">📸 사진 올리기</button>
+  </h1>
   <input id="q" placeholder="🔍 검색 (유형·단어)">
   ${tagbar}
 </header>
@@ -513,6 +518,33 @@ function openPicker(category, group, idx) {
   document.getElementById("pickerSearch").value = "";
   pk.classList.add("open"); load();
 }
+
+// 사진 업로드 + 추출
+document.getElementById("uploadInput").addEventListener("change", async function () {
+  var file = this.files[0];
+  if (!file) return;
+  this.value = "";
+  var btn = document.getElementById("uploadBtn");
+  btn.disabled = true; btn.textContent = "분석 중... 🐱";
+  var reader = new FileReader();
+  reader.onload = async function () {
+    var base64 = reader.result.split(",")[1];
+    try {
+      var res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: file.name, data: base64 }),
+      });
+      var json = await res.json();
+      if (!res.ok) throw new Error(json.error || "실패");
+      location.reload();
+    } catch (e) {
+      alert("😿 추출 실패: " + e.message);
+      btn.disabled = false; btn.textContent = "📸 사진 올리기";
+    }
+  };
+  reader.readAsDataURL(file);
+});
 </script>
 </body>
 </html>`;
