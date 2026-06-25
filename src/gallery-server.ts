@@ -12,11 +12,12 @@ import { translateToEnglish } from "./translate.js";
 import { extractPrompt } from "./engine.js";
 import { saveModule } from "./storage.js";
 import { ClaudeCliProvider } from "./providers/claude-cli.js";
+import { ClaudeProvider } from "./providers/claude.js";
 import type { VisionProvider } from "./providers/types.js";
 import { GeminiImageProvider, PollinationsImageProvider, type ImageProvider } from "./image-provider.js";
 import { aggregateElements, filterElements, readElementsMeta, writeElementMeta, updateModuleElements } from "./elements.js";
 
-const PORT = 4517;
+const PORT = Number(process.env.PORT) || 4517;
 
 const MIME: Record<string, string> = {
   ".png": "image/png",
@@ -179,7 +180,11 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
           const tmpPath = path.join(tmpdir(), `promptcat-upload-${Date.now()}${ext}`);
           await writeFile(tmpPath, Buffer.from(data, "base64"));
           try {
-            const extractor = opts.extractor ?? new ClaudeCliProvider();
+            const extractor = opts.extractor ?? (
+              process.env.ANTHROPIC_API_KEY
+                ? new ClaudeProvider({ apiKey: process.env.ANTHROPIC_API_KEY })
+                : new ClaudeCliProvider()
+            );
             const result = await extractPrompt(tmpPath, extractor);
             const dir = await saveModule({ imagePath: tmpPath, result, baseDir: root });
             res.writeHead(200, { "content-type": "application/json" });
@@ -257,7 +262,7 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
 
 // tsx로 직접 실행하면 서버를 켠다.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  createGalleryServer("modules").listen(PORT, () => {
+  createGalleryServer(process.env.DATA_DIR || "modules").listen(PORT, () => {
     console.log(`http://localhost:${PORT}`);
   });
 }
