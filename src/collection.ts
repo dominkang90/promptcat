@@ -7,6 +7,7 @@ export interface ModuleEntry {
   imageFile: string; // 예: "image.png"
   generatedImages: string[]; // gen-* 로 만든 그림 파일명들
   result: ExtractionResult;
+  favorite: boolean;
 }
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
@@ -15,6 +16,13 @@ const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 function stampKey(dir: string): string {
   const m = dir.match(/(\d{8}-\d{6})$/);
   return m ? m[1] : dir;
+}
+
+async function readFavorites(baseDir: string): Promise<Set<string>> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(path.join(baseDir, ".favorites.json"), "utf8"));
+    return new Set(Array.isArray(raw) ? (raw as string[]) : []);
+  } catch { return new Set(); }
 }
 
 // 사용자가 드래그로 바꾼 순서. baseDir/.order.json 에 폴더이름 배열로 저장된다.
@@ -35,6 +43,7 @@ export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
     return [];
   }
 
+  const favorites = await readFavorites(baseDir);
   const entries: ModuleEntry[] = [];
   for (const ent of dirents) {
     if (!ent.isDirectory()) continue;
@@ -51,7 +60,7 @@ export async function listModules(baseDir: string): Promise<ModuleEntry[]> {
       if (!imageFile) continue;
       const generatedImages = images.filter((f) => f.startsWith("gen-")).sort();
 
-      entries.push({ dir: ent.name, imageFile, generatedImages, result: parsed.data });
+      entries.push({ dir: ent.name, imageFile, generatedImages, result: parsed.data, favorite: favorites.has(ent.name) });
     } catch {
       continue;
     }

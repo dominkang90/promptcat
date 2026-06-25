@@ -37,8 +37,9 @@ export function renderGallery(entries: ModuleEntry[]): string {
       const tags = tagsFor(e.result);
       const chips = tags.map((t) => `#${escapeHtml(t)}`).join(" ");
       const src = `/img/${encodeURIComponent(e.dir)}/${encodeURIComponent(e.imageFile)}`;
-      return `<div class="card" draggable="true" data-dir="${escapeHtml(e.dir)}" data-search="${escapeHtml(searchText)}" data-tags="|${escapeHtml(tags.join("|"))}|" onclick="openDetail(${i})">
+      return `<div class="card" draggable="true" data-dir="${escapeHtml(e.dir)}" data-fav="${e.favorite ? "1" : "0"}" data-search="${escapeHtml(searchText)}" data-tags="|${escapeHtml(tags.join("|"))}|" onclick="openDetail(${i})">
   <button class="del" title="삭제" onclick="event.stopPropagation();delModule(this)">🗑️</button>
+  <button class="fav${e.favorite ? " on" : ""}" title="즐겨찾기" onclick="event.stopPropagation();toggleFav(this)">${e.favorite ? "★" : "☆"}</button>
   <img src="${src}" alt="" draggable="false">
   <div class="type">${escapeHtml(e.result.imageType)}</div>
   <div class="dir">${escapeHtml(e.dir)}</div>
@@ -49,7 +50,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 
   // 화면 위쪽 태그 버튼들 (전체 + 모든 프롬프트의 태그 모음)
   const allTags = [...new Set(entries.flatMap((e) => tagsFor(e.result)))];
-  const tagbar = `<div class="tagbar" id="tagbar"><button class="tag active" data-tag="">전체</button>${allTags
+  const tagbar = `<div class="tagbar" id="tagbar"><button class="tag active" data-tag="">전체</button><button class="tag" data-tag="__fav__">★ 즐겨찾기</button>${allTags
     .map((t) => `<button class="tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
     .join("")}</div>`;
 
@@ -78,6 +79,14 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .card .tags { font-size:10px; color:#c0689a; padding:0 8px 8px; word-break:break-all; }
   .card .del { position:absolute; top:6px; right:6px; z-index:2; border:none; background:rgba(0,0,0,.55); color:#fff; border-radius:6px; padding:3px 7px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .12s; }
   .card:hover .del { opacity:1; }
+  .card .fav { position:absolute; top:6px; left:6px; z-index:2; border:none; background:rgba(0,0,0,.45); border-radius:6px; padding:3px 7px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .12s; color:#ccc; }
+  .card:hover .fav, .card .fav.on { opacity:1; }
+  .card .fav.on { color:#ffd700; }
+  #loadingOverlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:9999; flex-direction:column; gap:14px; color:#fff; font-size:17px; }
+  #loadingOverlay.show { display:flex; }
+  .spinner { width:44px; height:44px; border:4px solid rgba(255,255,255,.25); border-top-color:#ff8fab; border-radius:50%; animation:spin .75s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  body.drag-over::after { content:'여기에 사진을 놓아요 📸'; position:fixed; inset:0; border:4px dashed #ff8fab; background:rgba(255,143,171,.12); pointer-events:none; z-index:9998; display:flex; align-items:center; justify-content:center; font-size:22px; color:#ff8fab; font-weight:700; }
   #uploadBtn { margin-left:auto; background:#ff8fab; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; white-space:nowrap; }
   #uploadBtn:disabled { opacity:.55; cursor:not-allowed; }
   .tagbar { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
@@ -130,7 +139,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 <body>
 <header>
   <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션
-    <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+    <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" multiple>
     <button id="uploadBtn">📸 사진 올리기</button>
   </h1>
   <input id="q" placeholder="🔍 검색 (유형·단어)">
@@ -138,6 +147,7 @@ export function renderGallery(entries: ModuleEntry[]): string {
 </header>
 ${body}
 
+<div id="loadingOverlay"><div class="spinner"></div><div id="loadingMsg">분석 중... 🐱</div></div>
 <div class="modal" id="modal">
   <div class="sheet" id="sheet"></div>
 </div>
@@ -170,7 +180,11 @@ function applyFilter() {
   const t = (document.getElementById("q").value || "").trim().toLowerCase();
   document.querySelectorAll(".card").forEach(function (c) {
     const okText = !t || c.dataset.search.indexOf(t) !== -1;
-    const okTag = !currentTag || c.dataset.tags.indexOf("|" + currentTag + "|") !== -1;
+    const okTag = !currentTag
+      ? true
+      : currentTag === "__fav__"
+        ? c.dataset.fav === "1"
+        : c.dataset.tags.indexOf("|" + currentTag + "|") !== -1;
     c.style.display = okText && okTag ? "" : "none";
   });
 }
@@ -264,6 +278,10 @@ function openDetail(i) {
   const close = document.createElement("button");
   close.className = "close"; close.textContent = "×"; close.addEventListener("click", closeDetail);
   sheet.appendChild(close);
+  const heroImg = document.createElement("img");
+  heroImg.src = "/img/" + encodeURIComponent(m.dir) + "/" + encodeURIComponent(m.imageFile);
+  heroImg.style.cssText = "width:100%;max-height:260px;object-fit:contain;background:#f0ecea;border-radius:8px;display:block;margin-bottom:12px";
+  sheet.appendChild(heroImg);
   const h2 = document.createElement("h2"); h2.textContent = m.result.imageType; sheet.appendChild(h2);
   addRow(sheet, "전체", m.result.fullPrompt);
 
@@ -519,31 +537,89 @@ function openPicker(category, group, idx) {
   pk.classList.add("open"); load();
 }
 
-// 사진 업로드 + 추출
-document.getElementById("uploadInput").addEventListener("change", async function () {
-  var file = this.files[0];
-  if (!file) return;
-  this.value = "";
+// 즐겨찾기 토글
+function toggleFav(btn) {
+  var card = btn.closest(".card");
+  var dir = card.dataset.dir;
+  var isFav = card.dataset.fav === "1";
+  fetch("/api/favorite", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dir: dir }),
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.ok) return;
+    var next = !isFav;
+    card.dataset.fav = next ? "1" : "0";
+    btn.textContent = next ? "★" : "☆";
+    btn.classList.toggle("on", next);
+    applyFilter();
+  }).catch(function () {});
+}
+
+// 업로드 공통 함수 (파일 한 장)
+function readFileAsBase64(file) {
+  return new Promise(function (resolve, reject) {
+    var r = new FileReader();
+    r.onload = function () { resolve(r.result.split(",")[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  var overlay = document.getElementById("loadingOverlay");
+  var msg = document.getElementById("loadingMsg");
   var btn = document.getElementById("uploadBtn");
-  btn.disabled = true; btn.textContent = "분석 중... 🐱";
-  var reader = new FileReader();
-  reader.onload = async function () {
-    var base64 = reader.result.split(",")[1];
+  btn.disabled = true;
+  overlay.classList.add("show");
+  var failed = 0;
+  for (var i = 0; i < files.length; i++) {
+    msg.textContent = files.length > 1
+      ? "분석 중 (" + (i + 1) + "/" + files.length + ")... 🐱"
+      : "분석 중... 🐱";
     try {
+      var base64 = await readFileAsBase64(files[i]);
       var res = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ filename: file.name, data: base64 }),
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: files[i].name, data: base64 }),
       });
       var json = await res.json();
       if (!res.ok) throw new Error(json.error || "실패");
-      location.reload();
     } catch (e) {
-      alert("😿 추출 실패: " + e.message);
-      btn.disabled = false; btn.textContent = "📸 사진 올리기";
+      failed++;
+      if (files.length === 1) { alert("😿 추출 실패: " + e.message); }
     }
-  };
-  reader.readAsDataURL(file);
+  }
+  overlay.classList.remove("show");
+  btn.disabled = false;
+  if (failed && files.length > 1) alert("😿 " + failed + "장 실패, " + (files.length - failed) + "장 성공");
+  location.reload();
+}
+
+// 파일 인풋 변경
+document.getElementById("uploadInput").addEventListener("change", function () {
+  var files = [].slice.call(this.files);
+  this.value = "";
+  uploadFiles(files);
+});
+
+// 드래그앤드롭
+document.addEventListener("dragover", function (e) {
+  e.preventDefault();
+  document.body.classList.add("drag-over");
+});
+document.addEventListener("dragleave", function (e) {
+  if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
+    document.body.classList.remove("drag-over");
+  }
+});
+document.addEventListener("drop", function (e) {
+  e.preventDefault();
+  document.body.classList.remove("drag-over");
+  var files = [].filter.call(e.dataTransfer.files, function (f) {
+    return f.type.startsWith("image/");
+  });
+  if (files.length) uploadFiles(files);
 });
 </script>
 </body>

@@ -172,6 +172,19 @@ export function createGalleryServer(baseDir: string, opts: GalleryServerOptions 
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/favorite") {
+        const { dir } = JSON.parse(await readBody(req)) as { dir: string };
+        const favFile = path.join(root, ".favorites.json");
+        let favs: string[];
+        try { favs = JSON.parse(await readFile(favFile, "utf8")) as string[]; } catch { favs = []; }
+        const set = new Set(favs);
+        if (set.has(dir)) set.delete(dir); else set.add(dir);
+        await writeFile(favFile, JSON.stringify([...set]));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, favorite: set.has(dir) }));
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/extract") {
         try {
           const { filename, data } = JSON.parse(await readBody(req)) as { filename: string; data: string };

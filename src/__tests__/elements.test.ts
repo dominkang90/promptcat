@@ -8,7 +8,7 @@ import type { ModuleEntry } from "../collection.js";
 
 function mod(dir: string, fixed: [string, string][], variable: [string, string, string][] = []): ModuleEntry {
   return {
-    dir, imageFile: "image.png", generatedImages: [],
+    dir, imageFile: "image.png", generatedImages: [], favorite: false,
     result: {
       imageType: "인물", fullPrompt: "", negativePrompt: "", notes: "",
       fixedElements: fixed.map(([category, value], i) => ({ id: "f" + i, category, value })),
