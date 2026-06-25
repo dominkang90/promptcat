@@ -37,13 +37,14 @@ export function renderGallery(entries: ModuleEntry[]): string {
       const tags = tagsFor(e.result);
       const chips = tags.map((t) => `#${escapeHtml(t)}`).join(" ");
       const src = `/img/${encodeURIComponent(e.dir)}/${encodeURIComponent(e.imageFile)}`;
-      return `<div class="card" draggable="true" data-dir="${escapeHtml(e.dir)}" data-fav="${e.favorite ? "1" : "0"}" data-search="${escapeHtml(searchText)}" data-tags="|${escapeHtml(tags.join("|"))}|" onclick="openDetail(${i})">
+      return `<div class="card" draggable="true" data-dir="${escapeHtml(e.dir)}" data-fav="${e.favorite ? "1" : "0"}" data-prompt="${escapeHtml(e.result.fullPrompt)}" data-search="${escapeHtml(searchText)}" data-tags="|${escapeHtml(tags.join("|"))}|" onclick="openDetail(${i})">
   <button class="del" title="삭제" onclick="event.stopPropagation();delModule(this)">🗑️</button>
   <button class="fav${e.favorite ? " on" : ""}" title="즐겨찾기" onclick="event.stopPropagation();toggleFav(this)">${e.favorite ? "★" : "☆"}</button>
   <img src="${src}" alt="" draggable="false">
   <div class="type">${escapeHtml(e.result.imageType)}</div>
   <div class="dir">${escapeHtml(e.dir)}</div>
   <div class="tags">${chips}</div>
+  <button class="cpy" onclick="event.stopPropagation();copyPrompt(this)">📋 프롬프트 복사</button>
 </div>`;
     })
     .join("\n");
@@ -134,6 +135,36 @@ export function renderGallery(entries: ModuleEntry[]): string {
   .pkval { font-weight:600; word-break:break-word; }
   .pkbtns { margin-top:4px; display:flex; gap:6px; }
   .pkbtns button { border:1px solid #ddd; background:#fff; border-radius:6px; padding:2px 8px; cursor:pointer; }
+  /* 카드 복사 버튼 */
+  .card .cpy { position:absolute; bottom:0; left:0; right:0; background:rgba(255,143,171,.88); color:#fff; border:none; padding:5px; font-size:12px; cursor:pointer; opacity:0; transition:opacity .12s; text-align:center; }
+  .card:hover .cpy { opacity:1; }
+  .card .cpy.ok { background:rgba(80,180,100,.88); }
+  /* 헤더 컨트롤 */
+  .hctrl { border:1px solid #ddd; background:#fff; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; white-space:nowrap; color:#555; }
+  #gridSlider { width:60px; vertical-align:middle; accent-color:#ff8fab; }
+  #exportDrop { position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.12); z-index:100; min-width:110px; overflow:hidden; }
+  #exportDrop button { display:block; width:100%; text-align:left; border:none; background:none; padding:8px 14px; cursor:pointer; font-size:13px; }
+  #exportDrop button:hover { background:#faf0f4; }
+  /* 다크모드 */
+  body.dark { background:#181818; color:#e8e8e8; }
+  body.dark header { background:#252525; box-shadow:0 1px 4px rgba(0,0,0,.4); }
+  body.dark .card { background:#252525; }
+  body.dark .card .dir { color:#666; }
+  body.dark #q { background:#2a2a2a; color:#e8e8e8; border-color:#444; }
+  body.dark .modal { background:rgba(0,0,0,.72); }
+  body.dark .sheet { background:#252525; color:#e8e8e8; }
+  body.dark .row { border-color:#333; }
+  body.dark .tag { background:#2a2a2a; border-color:#3a3a3a; color:#bbb; }
+  body.dark button.copy, body.dark .hctrl { background:#2a2a2a; border-color:#444; color:#ccc; }
+  body.dark .elcard { background:#2a2a2a; border-color:#333; }
+  body.dark .elcard.on { background:#3a1520; border-color:#ff8fab; }
+  body.dark .pkitem { background:#2a2a2a; border-color:#333; }
+  body.dark .eledit, body.dark #pickerSearch { background:#2a2a2a; color:#e8e8e8; border-color:#444; }
+  body.dark .addVar { background:#252525; }
+  body.dark .seltitle { color:#bbb; }
+  body.dark .elcard img, body.dark .card img { background:#1a1a1a; }
+  body.dark #exportDrop { background:#252525; border-color:#444; }
+  body.dark #exportDrop button:hover { background:#333; }
 </style>
 </head>
 <body>
@@ -141,6 +172,15 @@ export function renderGallery(entries: ModuleEntry[]): string {
   <h1><img class="logo" src="/mascot.png" alt="프롬냥이"> 프롬냥이 컬렉션
     <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" multiple>
     <button id="uploadBtn">📸 사진 올리기</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#888">크기<input type="range" id="gridSlider" min="120" max="280" value="150"></label>
+    <div style="position:relative">
+      <button class="hctrl" id="exportBtn">⬇️ 내보내기</button>
+      <div id="exportDrop" style="display:none">
+        <button onclick="doExport('json')">📄 JSON</button>
+        <button onclick="doExport('txt')">📝 텍스트</button>
+      </div>
+    </div>
+    <button class="hctrl" id="darkBtn">🌙</button>
   </h1>
   <input id="q" placeholder="🔍 검색 (유형·단어)">
   ${tagbar}
@@ -536,6 +576,64 @@ function openPicker(category, group, idx) {
   document.getElementById("pickerSearch").value = "";
   pk.classList.add("open"); load();
 }
+
+// 카드 프롬프트 복사
+function copyPrompt(btn) {
+  var prompt = btn.closest(".card").dataset.prompt || "";
+  navigator.clipboard.writeText(prompt).then(function () {
+    btn.textContent = "✅ 복사됨!"; btn.classList.add("ok");
+    setTimeout(function () { btn.textContent = "📋 프롬프트 복사"; btn.classList.remove("ok"); }, 1500);
+  });
+}
+
+// 그리드 크기 슬라이더
+document.getElementById("gridSlider").oninput = function () {
+  var grid = document.getElementById("grid");
+  if (grid) grid.style.gridTemplateColumns = "repeat(auto-fill,minmax(" + this.value + "px,1fr))";
+};
+
+// 다크모드
+(function () {
+  var btn = document.getElementById("darkBtn");
+  var dark = localStorage.getItem("dark") === "1";
+  function apply() { document.body.classList.toggle("dark", dark); btn.textContent = dark ? "☀️" : "🌙"; }
+  apply();
+  btn.onclick = function () { dark = !dark; localStorage.setItem("dark", dark ? "1" : "0"); apply(); };
+})();
+
+// 내보내기
+document.getElementById("exportBtn").onclick = function (e) {
+  e.stopPropagation();
+  var drop = document.getElementById("exportDrop");
+  drop.style.display = drop.style.display === "none" ? "block" : "none";
+};
+document.addEventListener("click", function () { document.getElementById("exportDrop").style.display = "none"; });
+
+function doExport(fmt) {
+  var content, mime, ext;
+  if (fmt === "json") {
+    content = JSON.stringify(MODULES, null, 2);
+    mime = "application/json"; ext = "json";
+  } else {
+    content = MODULES.map(function (m) {
+      return "# " + m.result.imageType + " (" + m.dir + ")\\n" + m.result.fullPrompt;
+    }).join("\\n\\n---\\n\\n");
+    mime = "text/plain"; ext = "txt";
+  }
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = "promptcat-export." + ext;
+  a.click();
+  document.getElementById("exportDrop").style.display = "none";
+}
+
+// Ctrl+V 붙여넣기 업로드
+document.addEventListener("paste", function (e) {
+  var items = [].filter.call(e.clipboardData.items, function (it) { return it.type.startsWith("image/"); });
+  if (!items.length) return;
+  var files = items.map(function (it) { return it.getAsFile(); }).filter(Boolean);
+  if (files.length) uploadFiles(files);
+});
 
 // 즐겨찾기 토글
 function toggleFav(btn) {
